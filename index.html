@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Daily Set — Full (Animations, Leaderboard, Avatars, Admin)</title>
+
+<!-- CSS: styling + animations + badge colors -->
+<style>
+  :root{
+    --bg:#eaf3ff; --card:#fff; --accent:#3b82f6; --muted:#667; --success:#22c55e;
+    --bronze:#cd7f32; --silver:#c0c0c0; --gold:#ffd700; --platinum:#e5e4e2;
+  }
+  body{font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#f8fbff);margin:0;min-height:100vh;display:flex;gap:18px;align-items:flex-start;padding:20px;box-sizing:border-box}
+  .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 12px 40px rgba(2,12,30,0.06)}
+  .small{max-width:300px}
+  input{width:100%;padding:10px;border-radius:8px;border:1px solid #d6e2f0;margin-top:8px;box-sizing:border-box;transition:box-shadow .12s}
+  input:focus{box-shadow:0 6px 18px rgba(59,130,246,0.12);outline:none}
+  button{background:var(--accent);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;margin:6px 4px;transition:transform .12s}
+  button:active{transform:scale(.98)}
+  .muted{color:var(--muted)}
+  #cardGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+  .cardTile{padding:12px;border-radius:8px;background:#f5f9ff;cursor:pointer;transition:transform .14s,box-shadow .14s,border .14s; border:2px solid transparent; user-select:none}
+  .cardTile:hover{transform:translateY(-6px);box-shadow:0 12px 25px rgba(59,130,246,0.12)}
+  .selected{border-color:#2563eb;transform:scale(1.02)}
+  .correct{border-color:var(--success);animation:correctPop .35s ease}
+  .wrong{border-color:#ff6b6b;animation:shake .35s ease}
+  @keyframes correctPop{0%{transform:scale(.98)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+  @keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}100%{transform:translateX(0)}}
+  .highlighted{border-color:gold;animation:glow 1s infinite alternate}
+  @keyframes glow{from{box-shadow:0 0 8px rgba(255,215,0,0.08)}to{box-shadow:0 0 20px rgba(255,215,0,0.14)}}
+
+  /* Leaderboard animations */
+  .lbFade{animation:fadeInUp .36s ease both}
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* overlay / confetti */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,10,20,0.35);z-index:9999}
+  .overlay.hidden{display:none}
+  .overlayCard{background:var(--card);padding:18px;border-radius:12px;text-align:center;box-shadow:0 20px 60px rgba(2,12,30,0.3);width:min(560px,92%)}
+  .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px}
+  .avatarSmall{width:24px;height:24px;border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle}
+  .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-weight:700;color:#222;margin-left:8px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+  .badge.bronze{background:var(--bronze);color:white}
+  .badge.silver{background:var(--silver);color:#111}
+  .badge.gold{background:var(--gold);color:#111}
+  .badge.platinum{background:var(--platinum);color:#111}
+  footer{width:100%;text-align:center;color:#888;margin-top:14px}
+  @media(max-width:900px){body{flex-direction:column;padding:12px}}
+</style>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="authCard" class="card small">
+  <h2>Daily Set — Sign in / Register</h2>
+  <input id="email" placeholder="Email (login)" />
+  <input id="password" type="password" placeholder="Password" />
+  <div style="margin-top:8px">
+    <button id="btnSignUp">Create account</button>
+    <button id="btnSignIn">Sign in</button>
+    <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
+  </div>
+  <p id="authMsg" class="muted"></p>
+
+  <hr style="margin:10px 0"/>
+
+  <label class="muted">Choose avatar (or upload):</label>
+  <div id="presetAvatars" style="display:flex;gap:8px;margin-top:8px"></div>
+  <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
+</div>
+
+<!-- GAME -->
+<div id="gameCard" class="card" style="flex:1;display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <h2 style="margin:0">Daily Set</h2>
+      <div id="userInfo" class="muted" style="margin-top:6px"></div>
+    </div>
+    <div style="text-align:right">
+      <div id="streakInfo" class="muted"></div>
+      <div style="margin-top:8px">
+        <button id="btnShare" style="display:none">Share score</button>
+        <button id="btnSaveScore" style="display:none">Save to leaderboard</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:10px">Find all 6 sets for today's puzzle.</p>
+  <p>Sets found: <strong id="foundCount">0</strong>/6</p>
+  <div id="cardGrid"></div>
+  <p id="status" class="muted"></p>
+
+  <!-- Admin tools (hidden, toggle with Ctrl+Shift+A) -->
+  <div id="adminTools" style="display:none;margin-top:12px">
+    <h4>Admin Tools</h4>
+    <button id="btnReroll">Re-roll Board</button>
+    <button id="btnResetProgress">Reset Progress</button>
+    <button id="btnHighlight">Highlight Sets</button>
+    <div id="adminUserList" style="margin-top:10px"></div>
+    <div style="margin-top:8px">
+      <h5>Leaderboard Management</h5>
+      <div id="adminLeaderboard" style="max-height:220px;overflow:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaderboard -->
+<aside class="card small" id="leaderboardCard">
+  <h3>Leaderboard</h3>
+  <ol id="leaderboardList" style="padding-left:18px"></ol>
+  <button id="btnRefreshLB">Refresh</button>
+</aside>
+
+<!-- Win overlay -->
+<div id="winOverlay" class="overlay hidden">
+  <div class="overlayCard">
+    <h2 id="winTitle">🎉 You found all 6 sets!</h2>
+    <p id="winDetail" class="muted"></p>
+    <div style="margin-top:12px">
+      <button id="overlayShare">Share</button>
+      <button id="overlaySave">Save to leaderboard</button>
+      <button id="overlayClose" style="background:#8899b2">Close</button>
+    </div>
+    <canvas id="confetti" style="margin-top:8px;width:100%;height:140px"></canvas>
+  </div>
+</div>
+
+<!-- Script: full app -->
+<script>
+/* ================= CONFIG: paste your keys ================= */
+const SUPABASE_URL = "REPLACE_WITH_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "REPLACE_WITH_SUPABASE_ANON_KEY";
+/* ========================================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ========== Avatars UI ========== */
+const PRESETS = [
+  "https://api.dicebear.com/6.x/thumbs/svg?seed=star",
+  "https://api.dicebear.com/6.x/thumbs/svg?seed=fox",
+  "https://api.dicebear.com/6.x/thumbs/svg?seed=cat",
+  "https://api.dicebear.com/6.x/thumbs/svg?seed=robot",
+  "https://api.dicebear.com/6.x/thumbs/svg?seed=sun"
+];
+let chosenAvatar = PRESETS[0];
+function renderPresets(){
+  const root = document.getElementById('presetAvatars');
+  root.innerHTML = "";
+  PRESETS.forEach(url=>{
+    const d = document.createElement('div');
+    d.style.width='44px'; d.style.height='44px'; d.style.borderRadius='50%';
+    d.style.overflow='hidden'; d.style.cursor='pointer';
+    d.innerHTML = `<img src="${url}" style="width:44px;height:44px;display:block" />`;
+    d.onclick = ()=> { chosenAvatar = url; root.querySelectorAll('div').forEach(x=>x.style.outline='none'); d.style.outline='3px solid rgba(59,130,246,0.18)'; };
+    root.appendChild(d);
+  });
+}
+renderPresets();
+document.getElementById('uploadAvatar').addEventListener('change', e=>{
+  const f = e.target.files?.[0];
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=> { chosenAvatar = r.result; };
+  r.readAsDataURL(f);
+});
+
+/* ========== Auth (Supabase Auth) ========== */
+const btnSignUp = document.getElementById('btnSignUp');
+const btnSignIn = document.getElementById('btnSignIn');
+const btnSignOut = document.getElementById('btnSignOut');
+const authMsg = document.getElementById('authMsg');
+
+let currentUser = null;
+let profile = null; // profile row from DB
+
+function showAuth(msg, error=false){ authMsg.textContent = msg; authMsg.style.color = error? 'crimson':'#666'; }
+
+btnSignUp.addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('password').value;
+  if(!email || !pw){ showAuth('Enter email and password', true); return; }
+  showAuth('Creating account...');
+  const { data, error } = await sb.auth.signUp({ email, password: pw }, { data: { avatar: chosenAvatar }});
+  if(error){ showAuth(error.message, true); return; }
+  // create profile row
+  await sb.from('profiles').upsert({ email, avatar_url: chosenAvatar, streak: 0 }, { onConflict: ['email'] });
+  showAuth('Account created — check email to confirm. Then sign in.');
+});
+
+btnSignIn.addEventListener('click', async () => {
+  const email = document.getElementById('email').value.trim();
+  const pw = document.getElementById('password').value;
+  if(!email || !pw){ showAuth('Enter email and password', true); return; }
+  showAuth('Signing in...');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  if(error){ showAuth(error.message, true); return; }
+  currentUser = data.user;
+  await loadProfile();
+  onSignedIn();
+  showAuth('Signed in');
+});
+
+btnSignOut.addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+  currentUser = null; profile = null;
+  document.getElementById('authCard').style.display = '';
+  document.getElementById('gameCard').style.display = 'none';
+  btnSignOut.style.display = 'none';
+  btnSignIn.style.display = '';
+  btnSignUp.style.display = '';
+  showAuth('Signed out');
+});
+
+/* listen to auth changes */
+sb.auth.onAuthStateChange((event, session) => {
+  if(session?.user){ currentUser = session.user; loadProfile().then(()=> onSignedIn()); }
+});
+
+/* profile load/create */
+async function loadProfile(){
+  if(!currentUser) return;
+  const email = currentUser.email;
+  const { data } = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
+  if(!data){
+    // create default profile
+    await sb.from('profiles').insert({ email, avatar_url: chosenAvatar, streak:0 });
+    profile = { email, avatar_url: chosenAvatar, streak:0, is_admin:false };
+  } else {
+    profile = data;
+  }
+}
+
+/* ========== Game Logic (same rules) ========== */
+const numbers = ["One","Two","Three"], shapes = ["Oval","Diamond","Squiggle"], colors = ["Red","Green","Purple"], fills = ["Solid","Striped","Open"];
+let cards = [], selected = [], validSets = [], setsFound = 0, dailySeed = 0, adminMode = false;
+
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a>>>15, 1 | a); t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t; return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
+function buildDeck(){ let d=[]; for(let n=0;n<3;n++) for(let s=0;s<3;s++) for(let c=0;c<3;c++) for(let f=0;f<3;f++) d.push({num:n,shape:s,color:c,fill:f}); return d; }
+function isSet(a,b,c){ function ch(x,y,z){ return (x===y && y===z) || (x!==y && x!==z && y!==z); } return ch(a.num,b.num,c.num) && ch(a.shape,b.shape,c.shape) && ch(a.color,b.color,c.color) && ch(a.fill,b.fill,c.fill); }
+function loadDailySeed(){ const t=new Date(); dailySeed = t.getFullYear()*10000 + (t.getMonth()+1)*100 + t.getDate(); }
+
+function generateBoard(){
+  const deck = buildDeck();
+  let rng = mulberry32(dailySeed);
+  while(true){
+    const board = [];
+    for(let i=0;i<12;i++) board.push(deck[Math.floor(rng()*deck.length)]);
+    const found=[];
+    for(let i=0;i<12;i++) for(let j=i+1;j<12;j++) for(let k=j+1;k<12;k++) if(isSet(board[i],board[j],board[k])) found.push([i,j,k]);
+    if(found.length===6){ cards=board; validSets=found; return; }
+    dailySeed++;
+    rng = mulberry32(dailySeed);
+  }
+}
+
+/* rendering */
+function renderBoard(){
+  const grid = document.getElementById('cardGrid'); grid.innerHTML='';
+  document.getElementById('foundCount').textContent = setsFound;
+  document.getElementById('status').textContent = '';
+  cards.forEach((c,i)=>{
+    const btn = document.createElement('div');
+    btn.className = 'cardTile';
+    btn.dataset.index = i;
+    btn.innerHTML = `<div style="font-weight:700">${numbers[c.num]}</div><div>${shapes[c.shape]}</div><div class="muted">${colors[c.color]} • ${fills[c.fill]}</div>`;
+    btn.onclick = ()=> selectCard(i);
+    grid.appendChild(btn);
+  });
+  document.getElementById('adminTools').style.display = (adminMode && profile?.is_admin) ? 'block' : 'none';
+  renderUserInfo();
+}
+
+function selectCard(i){
+  const el = document.querySelector(`[data-index="${i}"]`);
+  if(selected.includes(i)){ selected = selected.filter(x=>x!==i); el.classList.remove('selected'); return; }
+  if(selected.length < 3){ selected.push(i); el.classList.add('selected'); }
+  if(selected.length === 3) checkSelected();
+}
+
+function checkSelected(){
+  const chosen = selected.map(i=>cards[i]);
+  const els = selected.map(i=>document.querySelector(`[data-index="${i}"]`));
+  if(isSet(...chosen)){
+    els.forEach(e=>e.classList.add('correct'));
+    setsFound++; document.getElementById('foundCount').textContent = setsFound;
+    if(setsFound === 6) onWin();
+  } else {
+    els.forEach(e=>e.classList.add('wrong'));
+  }
+  setTimeout(()=> els.forEach(e=> e.classList.remove('selected','wrong','correct')),700);
+  selected = [];
+}
+
+/* ========== Win behavior + confetti ========== */
+function fireConfetti(){
+  const canvas = document.getElementById('confetti'); if(!canvas) return;
+  const ctx = canvas.getContext('2d'); canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+  const pieces = []; const colorsC = ['#ff4757','#ffa502','#2ed573','#1e90ff','#9b59b6'];
+  for(let i=0;i<90;i++) pieces.push({ x: Math.random()*canvas.width, y: Math.random()*-canvas.height, vx:(Math.random()-0.5)*3, vy: Math.random()*5+2, size: Math.random()*8+4, color: colorsC[Math.floor(Math.random()*colorsC.length)]});
+  let t=0;
+  function frame(){ ctx.clearRect(0,0,canvas.width,canvas.height); pieces.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size*0.6); }); t++; if(t<140) requestAnimationFrame(frame); else ctx.clearRect(0,0,canvas.width,canvas.height); }
+  requestAnimationFrame(frame);
+}
+
+function onWin(){
+  document.getElementById('status').textContent = "🎉 You found all 6 sets!";
+  // show overlay
+  document.getElementById('winDetail').textContent = `Great job, ${profile?.email || currentUser?.email || 'player'}!`;
+  // show badge derived from streak
+  const badge = badgeForStreak(profile?.streak || 0);
+  const badgeEl = document.createElement('span'); badgeEl.className = 'badge ' + badge.class; badgeEl.textContent = badge.label;
+  // attach in overlay
+  const winDetail = document.getElementById('winDetail');
+  winDetail.appendChild(badgeEl);
+  document.getElementById('winOverlay').classList.remove('hidden');
+  fireConfetti();
+  // after win: save score + update streak
+  const secondsTaken = 0; // placeholder — if you track time, pass it
+  document.getElementById('overlaySave').disabled = false;
+}
+
+/* share helpers */
+async function shareScore(){
+  const text = `${profile?.email || currentUser?.email || 'I'} solved Daily Set — 6/6 sets!`;
+  const url = location.href;
+  if(navigator.share){
+    try { await navigator.share({ title: 'Daily Set — I won!', text, url }); return; } catch(e){ console.warn(e); }
+  }
+  // fallback
+  try{ await navigator.clipboard.writeText(`${text} ${url}`); alert('Score copied to clipboard!'); } catch(e){ alert('Unable to share'); }
+}
+
+/* badge based on streak */
+function badgeForStreak(streak){
+  if(streak >= 21) return { label: 'Platinum', class:'platinum' };
+  if(streak >= 14) return { label: 'Gold', class:'gold' };
+  if(streak >= 7) return { label: 'Silver', class:'silver' };
+  if(streak >= 1) return { label: 'Bronze', class:'bronze' };
+  return { label: 'No badge', class:'' };
+}
+
+/* ========== Leaderboard & Streaks (server) ========== */
+/* submitScore (called when saving) */
+async function submitScore(username, secondsTaken=0){
+  const today = new Date().toISOString().split('T')[0];
+  try{
+    await sb.from('leaderboard').insert([{ username, score:6, sets_found:6, seconds_taken: secondsTaken, game_date: today }]);
+    // after save, refresh leaderboard
+    fetchLeaderboard();
+  }catch(e){ console.warn('submitScore', e); alert('Failed to save score'); }
+}
+
+/* update streaks (call on win) */
+async function updateStreak(username){
+  const today = new Date().toISOString().split('T')[0];
+  try{
+    const { data, error } = await sb.from('streaks').select('*').eq('username', username).maybeSingle();
+    if(error) throw error;
+    if(!data){
+      await sb.from('streaks').insert([{ username, last_played: today, streak_count: 1 }]);
+      return 1;
+    }
+    const last = data.last_played;
+    const diff = Math.floor((new Date(today) - new Date(last)) / (1000*60*60*24));
+    let newStreak = 1;
+    if(diff === 1) newStreak = data.streak_count + 1;
+    else if(diff === 0) newStreak = data.streak_count;
+    else newStreak = 1;
+    await sb.from('streaks').update({ streak_count: newStreak, last_played: today }).eq('username', username);
+    return newStreak;
+  }catch(e){ console.warn('updateStreak', e); return null; }
+}
+
+/* fetch leaderboard sorted by fastest time (A) */
+async function fetchLeaderboard(){
+  try{
+    const { data, error } = await sb.from('leaderboard').select('*').order('seconds_taken',{ascending:true}).order('inserted_at',{ascending:true}).limit(50);
+    if(error) throw error;
+    renderLeaderboard(data);
+    return data;
+  }catch(e){ console.warn('fetchLeaderboard', e); return []; }
+}
+
+/* render leaderboard UI */
+function renderLeaderboard(rows){
+  const ol = document.getElementById('leaderboardList');
+  ol.innerHTML = '';
+  rows.forEach((r, i)=>{
+    const li = document.createElement('li');
+    const av = r.avatar_url ? `<img src="${r.avatar_url}" class="avatarSmall">` : '';
+    li.className = 'lbFade';
+    li.innerHTML = `<strong>#${i+1}</strong> ${av}<strong>${r.username}</strong> — <strong>${r.seconds_taken}s</strong> <span class="muted">(${new Date(r.inserted_at).toLocaleDateString()})</span>`;
+    ol.appendChild(li);
+  });
+}
+
+/* admin: list leaderboard entries with delete buttons */
+async function renderAdminLeaderboard(){
+  const container = document.getElementById('adminLeaderboard');
+  container.innerHTML = '<em>Loading...</em>';
+  try{
+    const { data, error } = await sb.from('leaderboard').select('*').order('inserted_at',{ascending:false}).limit(200);
+    if(error) throw error;
+    container.innerHTML = '';
+    data.forEach(row=>{
+      const d = document.createElement('div');
+      d.style.marginBottom = '6px';
+      d.innerHTML = `${row.avatar_url ? `<img src="${row.avatar_url}" class="avatarSmall">` : ''}<strong>${row.username}</strong> — ${row.seconds_taken}s <button onclick="adminDeleteScore(${row.id})" style="margin-left:8px;background:#e11d48">Delete</button>`;
+      container.appendChild(d);
+    });
+  }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed to load</div>'; }
+}
+
+/* admin delete */
+window.adminDeleteScore = async function(id){
+  if(!confirm('Delete this leaderboard entry?')) return;
+  try{
+    await sb.from('leaderboard').delete().eq('id', id);
+    renderAdminLeaderboard();
+    fetchLeaderboard();
+  }catch(e){ console.warn(e); alert('Delete failed'); }
+}
+
+/* ========== Admin UI & user info ========== */
+function renderUserInfo(){
+  const ui = document.getElementById('userInfo');
+  ui.innerHTML = '';
+  const avatar = profile?.avatar_url ? `<img src="${profile.avatar_url}" class="avatar">` : (currentUser?.user_metadata?.avatar ? `<img src="${currentUser.user_metadata.avatar}" class="avatar">` : '');
+  const email = profile?.email || currentUser?.email || '';
+  ui.innerHTML = `${avatar}<strong>${email}</strong>`;
+  // show streak
+  document.getElementById('streakInfo').textContent = profile ? `Streak: ${profile.streak || 0}` : '';
+}
+
+/* admin user list */
+async function renderAdminUserList(){
+  if(!profile?.is_admin) return;
+  const container = document.getElementById('adminUserList'); container.innerHTML = '<em>Loading users...</em>';
+  try{
+    const { data } = await sb.from('profiles').select('*').limit(200);
+    container.innerHTML = '';
+    data.forEach(u=>{
+      const row = document.createElement('div');
+      row.style.marginBottom='6px';
+      row.innerHTML = `${u.avatar_url ? `<img src="${u.avatar_url}" class="avatarSmall">` : ''}<strong>${u.email}</strong> Streak: ${u.streak || 0} <button style="margin-left:8px" onclick="adminResetPw('${u.email}')">Reset PW</button>`;
+      container.appendChild(row);
+    });
+  }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed to load</div>'; }
+}
+
+/* admin reset pw helper (triggers reset email) */
+window.adminResetPw = function(email){
+  if(!confirm(`Send password reset email to ${email}?`)) return;
+  sb.auth.resetPasswordForEmail(email).then(()=> alert('Password reset email sent')).catch(e=>{ console.warn(e); alert('Failed') });
+}
+
+/* ========== UI wiring ========== */
+document.getElementById('btnRefreshLB').addEventListener('click', fetchLeaderboard);
+document.getElementById('overlayClose').addEventListener('click', ()=> document.getElementById('winOverlay').classList.add('hidden'));
+document.getElementById('overlayShare').addEventListener('click', shareScore);
+document.getElementById('overlaySave').addEventListener('click', async ()=>{
+  // when pressing Save: submit score and update streak
+  if(!currentUser){ alert('Sign in first'); return; }
+  const seconds = 0; // if you track a timer, use actual seconds
+  await submitScore(currentUser.email, seconds);
+  const newStreak = await updateStreak(currentUser.email);
+  // update profile locally
+  profile = { ...(profile||{}), streak: newStreak };
+  document.getElementById('streakInfo').textContent = `Streak: ${newStreak}`;
+  alert('Saved! Streak: ' + newStreak);
+  document.getElementById('winOverlay').classList.add('hidden');
+});
+
+document.getElementById('btnSaveScore').addEventListener('click', async ()=>{
+  if(!currentUser){ alert('Sign in'); return; }
+  await submitScore(currentUser.email, 0);
+});
+
+document.getElementById('btnShare').addEventListener('click', shareScore);
+
+/* keyboard shortcut to toggle admin tools: Ctrl+Shift+A */
+document.addEventListener('keydown', (e)=>{
+  if(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a'){
+    if(!profile?.is_admin){ alert('Admin only'); return; }
+    adminMode = !adminMode;
+    document.getElementById('adminTools').style.display = adminMode ? 'block' : 'none';
+    if(adminMode){ renderAdminUserList(); renderAdminLeaderboard(); }
+  }
+});
+
+/* ========== Sign-in completed UI transition ========== */
+function onSignedIn(){
+  document.getElementById('authCard').style.display = 'none';
+  document.getElementById('gameCard').style.display = '';
+  btnSignOut.style.display = '';
+  btnSignIn.style.display = 'none';
+  btnSignUp.style.display = 'none';
+  document.getElementById('btnShare').style.display = '';
+  document.getElementById('btnSaveScore').style.display = '';
+  renderUserInfo();
+  fetchLeaderboard();
+  // ensure profile exists (create or update)
+  sb.from('profiles').upsert({ email: profile.email, avatar_url: profile.avatar_url || chosenAvatar }, { onConflict: ['email'] }).then(()=>{});
+  // start game (profile.is_admin used to gate admin)
+  startGame(!!profile?.is_admin);
+}
+
+/* ========== Game start / wiring ========== */
+function startGame(isAdminFlag){
+  adminMode = false;
+  setsFound = 0;
+  loadDailySeed();
+  generateBoard();
+  renderBoard();
+}
+
+/* initial fetch/refresh */
+fetchLeaderboard();
+setInterval(fetchLeaderboard, 60_000);
+
+</script>
+
+</body>
+</html>
