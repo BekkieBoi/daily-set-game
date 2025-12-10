@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Daily Set — Timer + Supabase Storage</title>
+  <title>Daily Set — Timer + Supabase Storage (Fixed)</title>
   <style>
     :root{--bg:#eaf3ff;--card:#fff;--accent:#3b82f6;--muted:#667;--success:#22c55e}
     body{font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#f8fbff);margin:0;min-height:100vh;display:flex;gap:18px;align-items:flex-start;padding:20px;box-sizing:border-box}
@@ -29,7 +29,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-
   <!-- AUTH -->
   <div id="authCard" class="card small">
     <h2>Daily Set — Sign in / Register</h2>
@@ -96,7 +95,7 @@
       <p id="winDetail" class="muted"></p>
       <div style="margin-top:12px">
         <button id="overlayShare">Share</button>
-        <button id="overlaySave">Save to leaderboard</button>
+        <button id="overlaySave" disabled>Save to leaderboard</button>
         <button id="overlayClose" style="background:#8899b2">Close</button>
       </div>
       <canvas id="confetti" style="margin-top:8px;width:100%;height:140px"></canvas>
@@ -104,312 +103,417 @@
   </div>
 
 <script>
-/* ================== CONFIG: replace these ================== */
-const SUPABASE_URL = "REPLACE_WITH_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "REPLACE_WITH_SUPABASE_ANON_KEY";
-/* ========================================================== */
+window.addEventListener('DOMContentLoaded', () => {
+  console.log('Daily Set app loaded');
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  /* ================== CONFIG: replace these ================== */
+  const SUPABASE_URL = "REPLACE_WITH_SUPABASE_URL";
+  const SUPABASE_ANON_KEY = "REPLACE_WITH_SUPABASE_ANON_KEY";
+  /* ========================================================== */
 
-/* ---------- UI: avatars ---------- */
-const PRESETS = [
-  "https://api.dicebear.com/6.x/thumbs/svg?seed=star",
-  "https://api.dicebear.com/6.x/thumbs/svg?seed=fox",
-  "https://api.dicebear.com/6.x/thumbs/svg?seed=cat",
-  "https://api.dicebear.com/6.x/thumbs/svg?seed=robot"
-];
-let chosenAvatar = PRESETS[0];
-function renderPresets(){ const root=document.getElementById('presetAvatars'); root.innerHTML=''; PRESETS.forEach(url=>{ const d=document.createElement('div'); d.style.width='44px'; d.style.height='44px'; d.style.borderRadius='50%'; d.style.overflow='hidden'; d.style.cursor='pointer'; d.innerHTML=`<img src="${url}" style="width:44px;height:44px;display:block" />`; d.onclick=()=>{ chosenAvatar=url; root.querySelectorAll('div').forEach(x=>x.style.outline='none'); d.style.outline='3px solid rgba(59,130,246,0.18)'; }; root.appendChild(d); });}
-renderPresets();
-document.getElementById('uploadAvatar').addEventListener('change', async (e)=>{
-  const f = e.target.files?.[0];
-  if(!f) return;
-  // if user is signed in, upload immediately to Supabase Storage
-  if(currentUser){
+  // create client
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  /* ---------- UI: avatars ---------- */
+  const PRESETS = [
+    "https://api.dicebear.com/6.x/thumbs/svg?seed=star",
+    "https://api.dicebear.com/6.x/thumbs/svg?seed=fox",
+    "https://api.dicebear.com/6.x/thumbs/svg?seed=cat",
+    "https://api.dicebear.com/6.x/thumbs/svg?seed=robot"
+  ];
+  let chosenAvatar = PRESETS[0];
+
+  function renderPresets(){
+    const root = document.getElementById('presetAvatars');
+    if(!root) return;
+    root.innerHTML = "";
+    PRESETS.forEach(url=>{
+      const d = document.createElement('div');
+      d.style.width='44px'; d.style.height='44px'; d.style.borderRadius='50%';
+      d.style.overflow='hidden'; d.style.cursor='pointer';
+      d.innerHTML = `<img src="${url}" style="width:44px;height:44px;display:block" />`;
+      d.onclick = ()=> { chosenAvatar = url; root.querySelectorAll('div').forEach(x=>x.style.outline='none'); d.style.outline='3px solid rgba(59,130,246,0.18)'; };
+      root.appendChild(d);
+    });
+  }
+  renderPresets();
+
+  const uploadEl = document.getElementById('uploadAvatar');
+  uploadEl && uploadEl.addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0];
+    if(!f) return;
     try{
-      const path = `avatars/${currentUser.id}/${Date.now()}_${f.name}`;
-      await sb.storage.from('avatars').upload(path, f, { upsert: true });
-      const { publicURL } = sb.storage.from('avatars').getPublicUrl(path);
-      // update profile row with publicURL
-      await sb.from('profiles').upsert({ email: currentUser.email, avatar_url: publicURL }, { onConflict: ['email'] });
-      profile = { ...(profile||{}), avatar_url: publicURL };
-      chosenAvatar = publicURL;
-      renderUserInfo();
-      alert('Avatar uploaded');
-    }catch(err){ console.warn('upload failed', err); alert('Avatar upload failed'); }
-  } else {
-    // store locally as preview (data URL)
-    const reader = new FileReader();
-    reader.onload = ()=> { chosenAvatar = reader.result; };
-    reader.readAsDataURL(f);
-  }
-});
-
-/* ---------- Auth (Supabase Auth) ---------- */
-const btnSignUp = document.getElementById('btnSignUp');
-const btnSignIn = document.getElementById('btnSignIn');
-const btnSignOut = document.getElementById('btnSignOut');
-const authMsg = document.getElementById('authMsg');
-
-let currentUser = null;
-let profile = null;
-
-function showAuth(msg, error=false){ authMsg.textContent = msg; authMsg.style.color = error? 'crimson':'#666'; }
-
-btnSignUp.addEventListener('click', async ()=>{
-  const email = document.getElementById('email').value.trim();
-  const pw = document.getElementById('password').value;
-  if(!email || !pw){ showAuth('Enter email and password', true); return; }
-  showAuth('Creating account...');
-  const { data, error } = await sb.auth.signUp({ email, password: pw }, { data: { avatar: chosenAvatar }});
-  if(error){ showAuth(error.message, true); return; }
-  // create profile row
-  await sb.from('profiles').upsert({ email, avatar_url: chosenAvatar, streak: 0 }, { onConflict: ['email'] });
-  showAuth('Account created — confirm email then sign in.');
-});
-
-btnSignIn.addEventListener('click', async ()=>{
-  const email = document.getElementById('email').value.trim();
-  const pw = document.getElementById('password').value;
-  if(!email || !pw){ showAuth('Enter email and password', true); return; }
-  showAuth('Signing in...');
-  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
-  if(error){ showAuth(error.message, true); return; }
-  currentUser = data.user;
-  await loadProfile();
-  onSignedIn();
-  showAuth('Signed in');
-});
-
-btnSignOut.addEventListener('click', async ()=>{
-  await sb.auth.signOut();
-  currentUser = null; profile = null;
-  document.getElementById('authCard').style.display = '';
-  document.getElementById('gameCard').style.display = 'none';
-  btnSignOut.style.display = 'none';
-  btnSignIn.style.display = '';
-  btnSignUp.style.display = '';
-  showAuth('Signed out');
-});
-
-sb.auth.onAuthStateChange((event, session) => {
-  if(session?.user){ currentUser = session.user; loadProfile().then(()=> onSignedIn()); }
-});
-
-/* load or create profile */
-async function loadProfile(){
-  if(!currentUser) return;
-  const email = currentUser.email;
-  const { data } = await sb.from('profiles').select('*').eq('email', email).maybeSingle();
-  if(!data){
-    await sb.from('profiles').insert({ email, avatar_url: chosenAvatar, streak:0 });
-    profile = { email, avatar_url: chosenAvatar, streak: 0, is_admin: false };
-  } else {
-    profile = data;
-  }
-}
-
-/* ---------- Game logic + timer ---------- */
-const numbers = ["One","Two","Three"], shapes = ["Oval","Diamond","Squiggle"], colors = ["Red","Green","Purple"], fills = ["Solid","Striped","Open"];
-let cards = [], selected = [], validSets = [], setsFound = 0, dailySeed = 0, adminMode = false;
-let timerInterval = null, startTime = null, elapsedSeconds = 0;
-
-function startTimer(){
-  stopTimer();
-  startTime = Date.now();
-  elapsedSeconds = 0;
-  document.getElementById('timerDisplay').textContent = '0s';
-  timerInterval = setInterval(()=>{
-    elapsedSeconds = Math.floor((Date.now() - startTime)/1000);
-    document.getElementById('timerDisplay').textContent = elapsedSeconds + 's';
-  }, 250);
-}
-function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInterval = null; } }
-
-function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a>>>15, 1 | a); t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t; return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
-function buildDeck(){ let d=[]; for(let n=0;n<3;n++) for(let s=0;s<3;s++) for(let c=0;c<3;c++) for(let f=0;f<3;f++) d.push({num:n,shape:s,color:c,fill:f}); return d; }
-function isSet(a,b,c){ function ch(x,y,z){ return (x===y&&y===z)||(x!==y&&x!==z&&y!==z); } return ch(a.num,b.num,c.num) && ch(a.shape,b.shape,c.shape) && ch(a.color,b.color,c.color) && ch(a.fill,b.fill,c.fill); }
-function loadDailySeed(){ const t=new Date(); dailySeed = t.getFullYear()*10000 + (t.getMonth()+1)*100 + t.getDate(); }
-
-function generateBoard(){
-  const deck = buildDeck();
-  let rng = mulberry32(dailySeed);
-  while(true){
-    const board = [];
-    for(let i=0;i<12;i++) board.push(deck[Math.floor(rng()*deck.length)]);
-    const found=[];
-    for(let i=0;i<12;i++) for(let j=i+1;j<12;j++) for(let k=j+1;k<12;k++) if(isSet(board[i],board[j],board[k])) found.push([i,j,k]);
-    if(found.length===6){ cards=board; validSets=found; return; }
-    dailySeed++; rng = mulberry32(dailySeed);
-  }
-}
-
-function renderBoard(){
-  const grid = document.getElementById('cardGrid'); grid.innerHTML=''; document.getElementById('foundCount').textContent = setsFound; document.getElementById('status').textContent = '';
-  cards.forEach((c,i)=>{ const btn=document.createElement('div'); btn.className='cardTile'; btn.dataset.index=i; btn.innerHTML = `<div style="font-weight:700">${numbers[c.num]}</div><div>${shapes[c.shape]}</div><div class="muted">${colors[c.color]} • ${fills[c.fill]}</div>`; btn.onclick = ()=> selectCard(i); grid.appendChild(btn); });
-  document.getElementById('adminTools').style.display = (adminMode && profile?.is_admin)?'block':'none';
-  renderUserInfo();
-}
-
-function selectCard(i){
-  const el = document.querySelector(`[data-index="${i}"]`);
-  if(selected.includes(i)){ selected=selected.filter(x=>x!==i); el.classList.remove('selected'); return; }
-  if(selected.length<3){ selected.push(i); el.classList.add('selected'); }
-  if(selected.length===3) checkSelected();
-}
-
-function checkSelected(){
-  const chosen = selected.map(i=>cards[i]);
-  const els = selected.map(i=>document.querySelector(`[data-index="${i}"]`));
-  if(isSet(...chosen)){
-    els.forEach(e=>e.classList.add('correct'));
-    setsFound++; document.getElementById('foundCount').textContent = setsFound;
-    if(setsFound===6) {
-      stopTimer();
-      onWin();
+      if(currentUser){
+        // upload to Supabase storage (bucket must exist and be public or use signed URLs)
+        const path = `avatars/${currentUser.id}/${Date.now()}_${f.name}`;
+        const up = await supabaseClient.storage.from('avatars').upload(path, f, { upsert: true });
+        if(up.error) throw up.error;
+        const publicRes = supabaseClient.storage.from('avatars').getPublicUrl(path);
+        const publicURL = publicRes?.data?.publicUrl || null;
+        if(publicURL){
+          await supabaseClient.from('profiles').upsert({ email: currentUser.email, avatar_url: publicURL }, { onConflict: ['email'] });
+          profile = { ...(profile||{}), avatar_url: publicURL };
+          chosenAvatar = publicURL;
+          renderUserInfo();
+          alert('Avatar uploaded');
+        } else {
+          throw new Error('Could not get public URL');
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onload = ()=> { chosenAvatar = reader.result; };
+        reader.readAsDataURL(f);
+      }
+    }catch(err){
+      console.warn('upload failed', err);
+      alert('Avatar upload failed (check console)');
     }
-  } else {
-    els.forEach(e=>e.classList.add('wrong'));
+  });
+
+  /* ---------- Auth (Supabase Auth) ---------- */
+  const btnSignUp = document.getElementById('btnSignUp');
+  const btnSignIn = document.getElementById('btnSignIn');
+  const btnSignOut = document.getElementById('btnSignOut');
+  const authMsg = document.getElementById('authMsg');
+
+  let currentUser = null;
+  let profile = null;
+
+  function showAuth(msg, error=false){ if(!authMsg) return; authMsg.textContent = msg; authMsg.style.color = error? 'crimson':'#666'; }
+
+  btnSignUp && btnSignUp.addEventListener('click', async ()=>{
+    try{
+      const email = document.getElementById('email').value.trim();
+      const pw = document.getElementById('password').value;
+      if(!email || !pw){ showAuth('Enter email and password', true); return; }
+      showAuth('Creating account...');
+      const { data, error } = await supabaseClient.auth.signUp({ email, password: pw }, { data: { avatar: chosenAvatar }});
+      if(error){ showAuth(error.message, true); return; }
+      await supabaseClient.from('profiles').upsert({ email, avatar_url: chosenAvatar, streak: 0 }, { onConflict: ['email'] });
+      showAuth('Account created — confirm email then sign in.');
+    }catch(e){
+      console.error('signUp err', e);
+      showAuth('Sign up failed (see console)', true);
+    }
+  });
+
+  btnSignIn && btnSignIn.addEventListener('click', async ()=>{
+    try{
+      const email = document.getElementById('email').value.trim();
+      const pw = document.getElementById('password').value;
+      if(!email || !pw){ showAuth('Enter email and password', true); return; }
+      showAuth('Signing in...');
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pw });
+      if(error){ showAuth(error.message, true); return; }
+      currentUser = data.user;
+      await loadProfile();
+      onSignedIn();
+      showAuth('Signed in');
+    }catch(e){
+      console.error('signIn err', e);
+      showAuth('Sign in failed (see console)', true);
+    }
+  });
+
+  btnSignOut && btnSignOut.addEventListener('click', async ()=>{
+    try{
+      await supabaseClient.auth.signOut();
+      currentUser = null; profile = null;
+      document.getElementById('authCard').style.display = '';
+      document.getElementById('gameCard').style.display = 'none';
+      btnSignOut.style.display = 'none';
+      btnSignIn.style.display = '';
+      btnSignUp.style.display = '';
+      showAuth('Signed out');
+    }catch(e){
+      console.warn('signOut err', e);
+    }
+  });
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if(session?.user){ currentUser = session.user; loadProfile().then(()=> onSignedIn()).catch(e=>console.warn(e)); }
+  });
+
+  /* load or create profile */
+  async function loadProfile(){
+    if(!currentUser) return;
+    const email = currentUser.email;
+    try {
+      const { data, error } = await supabaseClient.from('profiles').select('*').eq('email', email).maybeSingle();
+      if(error) console.warn('profile fetch error', error);
+      if(!data){
+        await supabaseClient.from('profiles').insert({ email, avatar_url: chosenAvatar, streak:0 });
+        profile = { email, avatar_url: chosenAvatar, streak: 0, is_admin: false };
+      } else {
+        profile = data;
+      }
+    } catch(e){
+      console.warn('loadProfile error', e);
+    }
   }
-  setTimeout(()=> els.forEach(e=>e.classList.remove('selected','wrong','correct')),700);
-  selected = [];
-}
 
-/* ---------- Win: overlay, confetti, save with seconds_taken ---------- */
-function fireConfetti(){ const canvas=document.getElementById('confetti'); if(!canvas) return; const ctx=canvas.getContext('2d'); canvas.width=canvas.clientWidth; canvas.height=canvas.clientHeight; const pieces=[]; const colors=['#ff4757','#ffa502','#2ed573','#1e90ff','#9b59b6']; for(let i=0;i<90;i++) pieces.push({x:Math.random()*canvas.width,y:Math.random()*-canvas.height,vx:(Math.random()-0.5)*3,vy:Math.random()*5+2,size:Math.random()*8+4,color:colors[Math.floor(Math.random()*colors.length)]}); let t=0; function frame(){ ctx.clearRect(0,0,canvas.width,canvas.height); pieces.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size*0.6); }); t++; if(t<140) requestAnimationFrame(frame); else ctx.clearRect(0,0,canvas.width,canvas.height); } requestAnimationFrame(frame); }
+  /* ---------- Game logic + timer ---------- */
+  const numbers = ["One","Two","Three"], shapes = ["Oval","Diamond","Squiggle"], colors = ["Red","Green","Purple"], fills = ["Solid","Striped","Open"];
+  let cards = [], selected = [], validSets = [], setsFound = 0, dailySeed = 0, adminMode = false;
+  let timerInterval = null, startTime = null, elapsedSeconds = 0;
 
-async function onWin(){
-  document.getElementById('status').textContent = "🎉 You found all 6 sets!";
-  const seconds = elapsedSeconds || Math.floor((Date.now()-startTime)/1000);
-  document.getElementById('winDetail').textContent = `Great job, ${profile?.email || currentUser?.email || 'player'} — time: ${seconds}s`;
-  document.getElementById('winOverlay').classList.remove('hidden');
-  fireConfetti();
-  // enable save and share
-  document.getElementById('overlaySave').disabled = false;
-  document.getElementById('overlaySave').dataset.seconds = seconds;
-}
+  function startTimer(){
+    stopTimer();
+    startTime = Date.now();
+    elapsedSeconds = 0;
+    const td = document.getElementById('timerDisplay'); if(td) td.textContent = '0s';
+    timerInterval = setInterval(()=>{
+      elapsedSeconds = Math.floor((Date.now() - startTime)/1000);
+      const td2 = document.getElementById('timerDisplay'); if(td2) td2.textContent = elapsedSeconds + 's';
+    }, 250);
+  }
+  function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInterval = null; } }
 
-/* share and save wiring */
-document.getElementById('overlayClose').addEventListener('click', ()=> document.getElementById('winOverlay').classList.add('hidden'));
-document.getElementById('overlayShare').addEventListener('click', ()=> {
-  const s = document.getElementById('overlaySave').dataset.seconds || elapsedSeconds || 0;
-  const text = `${profile?.email || currentUser?.email || 'I'} solved Daily Set — 6/6 in ${s}s!`;
-  if(navigator.share){ navigator.share({ title:'Daily Set', text, url: location.href }).catch(()=> navigator.clipboard.writeText(text)); }
-  else navigator.clipboard.writeText(text);
-});
-document.getElementById('overlaySave').addEventListener('click', async ()=>{
-  if(!currentUser){ alert('Sign in first'); return; }
-  const seconds = parseInt(document.getElementById('overlaySave').dataset.seconds || elapsedSeconds || 0);
-  await submitScore(currentUser.email, seconds);
-  const newStreak = await updateStreak(currentUser.email);
-  profile = { ...(profile||{}), streak: newStreak };
-  document.getElementById('streakInfo').textContent = `Streak: ${newStreak}`;
-  alert('Saved! Streak: ' + newStreak);
-  document.getElementById('winOverlay').classList.add('hidden');
-});
+  function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a>>>15, 1 | a); t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t; return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
+  function buildDeck(){ let d=[]; for(let n=0;n<3;n++) for(let s=0;s<3;s++) for(let c=0;c<3;c++) for(let f=0;f<3;f++) d.push({num:n,shape:s,color:c,fill:f}); return d; }
+  function isSet(a,b,c){ function ch(x,y,z){ return (x===y&&y===z)||(x!==y&&x!==z&&y!==z); } return ch(a.num,b.num,c.num) && ch(a.shape,b.shape,c.shape) && ch(a.color,b.color,c.color) && ch(a.fill,b.fill,c.fill); }
+  function loadDailySeed(){ const t=new Date(); dailySeed = t.getFullYear()*10000 + (t.getMonth()+1)*100 + t.getDate(); }
 
-/* ---------- Leaderboard / Streaks (server) ---------- */
-async function submitScore(username, secondsTaken=0){
-  const today = new Date().toISOString().split('T')[0];
-  try{
-    await sb.from('leaderboard').insert([{ username, score:6, sets_found:6, seconds_taken: secondsTaken, game_date: today }]);
+  function generateBoard(){
+    const deck = buildDeck();
+    let rng = mulberry32(dailySeed);
+    while(true){
+      const board = [];
+      for(let i=0;i<12;i++) board.push(deck[Math.floor(rng()*deck.length)]);
+      const found=[];
+      for(let i=0;i<12;i++) for(let j=i+1;j<12;j++) for(let k=j+1;k<12;k++) if(isSet(board[i],board[j],board[k])) found.push([i,j,k]);
+      if(found.length===6){ cards=board; validSets=found; return; }
+      dailySeed++; rng = mulberry32(dailySeed);
+    }
+  }
+
+  function renderBoard(){
+    const grid = document.getElementById('cardGrid'); if(!grid) return;
+    grid.innerHTML = '';
+    const foundCountEl = document.getElementById('foundCount'); if(foundCountEl) foundCountEl.textContent = setsFound;
+    const statusEl = document.getElementById('status'); if(statusEl) statusEl.textContent = '';
+    cards.forEach((c,i)=>{
+      const btn = document.createElement('div');
+      btn.className = 'cardTile';
+      btn.dataset.index = i;
+      btn.innerHTML = `<div style="font-weight:700">${numbers[c.num]}</div><div>${shapes[c.shape]}</div><div class="muted">${colors[c.color]} • ${fills[c.fill]}</div>`;
+      btn.onclick = ()=> selectCard(i);
+      grid.appendChild(btn);
+    });
+    document.getElementById('adminTools').style.display = (adminMode && profile?.is_admin)?'block':'none';
+    renderUserInfo();
+  }
+
+  function selectCard(i){
+    const el = document.querySelector(`[data-index="${i}"]`);
+    if(!el) return;
+    if(selected.includes(i)){ selected = selected.filter(x=>x!==i); el.classList.remove('selected'); return; }
+    if(selected.length < 3){ selected.push(i); el.classList.add('selected'); }
+    if(selected.length === 3) checkSelected();
+  }
+
+  function checkSelected(){
+    const chosen = selected.map(i=>cards[i]);
+    const els = selected.map(i=>document.querySelector(`[data-index="${i}"]`)).filter(Boolean);
+    if(chosen.length !== 3){ selected = []; return; }
+    if(isSet(...chosen)){
+      els.forEach(e=>e.classList.add('correct'));
+      setsFound++; const fc = document.getElementById('foundCount'); if(fc) fc.textContent = setsFound;
+      if(setsFound === 6) {
+        stopTimer();
+        onWin();
+      }
+    } else {
+      els.forEach(e=>e.classList.add('wrong'));
+    }
+    setTimeout(()=> els.forEach(e=>e.classList.remove('selected','wrong','correct')),700);
+    selected = [];
+  }
+
+  /* ---------- Win: overlay, confetti, save with seconds_taken ---------- */
+  function fireConfetti(){ const canvas=document.getElementById('confetti'); if(!canvas) return; const ctx=canvas.getContext('2d'); canvas.width=canvas.clientWidth; canvas.height=canvas.clientHeight; const pieces=[]; const colorsArr=['#ff4757','#ffa502','#2ed573','#1e90ff','#9b59b6']; for(let i=0;i<90;i++) pieces.push({x:Math.random()*canvas.width,y:Math.random()*-canvas.height,vx:(Math.random()-0.5)*3,vy:Math.random()*5+2,size:Math.random()*8+4,color:colorsArr[Math.floor(Math.random()*colorsArr.length)]}); let t=0; function frame(){ ctx.clearRect(0,0,canvas.width,canvas.height); pieces.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size*0.6); }); t++; if(t<140) requestAnimationFrame(frame); else ctx.clearRect(0,0,canvas.width,canvas.height); } requestAnimationFrame(frame); }
+
+  async function onWin(){
+    const statusEl = document.getElementById('status'); if(statusEl) statusEl.textContent = "🎉 You found all 6 sets!";
+    const seconds = elapsedSeconds || (startTime ? Math.floor((Date.now()-startTime)/1000) : 0);
+    const winDetail = document.getElementById('winDetail'); if(winDetail) winDetail.textContent = `Great job, ${profile?.email || currentUser?.email || 'player'} — time: ${seconds}s`;
+    const overlay = document.getElementById('winOverlay'); if(overlay) overlay.classList.remove('hidden');
+    fireConfetti();
+    const overlaySave = document.getElementById('overlaySave');
+    if(overlaySave){
+      overlaySave.disabled = false;
+      overlaySave.dataset.seconds = seconds;
+    }
+  }
+
+  /* share and save wiring */
+  const overlayClose = document.getElementById('overlayClose');
+  overlayClose && overlayClose.addEventListener('click', ()=> document.getElementById('winOverlay').classList.add('hidden'));
+
+  const overlayShare = document.getElementById('overlayShare');
+  overlayShare && overlayShare.addEventListener('click', ()=> {
+    try{
+      const s = document.getElementById('overlaySave')?.dataset?.seconds || elapsedSeconds || 0;
+      const text = `${profile?.email || currentUser?.email || 'I'} solved Daily Set — 6/6 in ${s}s!`;
+      if(navigator.share){ navigator.share({ title:'Daily Set', text, url: location.href }).catch(()=> navigator.clipboard.writeText(text)); }
+      else navigator.clipboard.writeText(text);
+      alert('Share attempted / copied to clipboard.');
+    }catch(e){ console.warn('share error', e); alert('Share failed'); }
+  });
+
+  const overlaySaveBtn = document.getElementById('overlaySave');
+  overlaySaveBtn && overlaySaveBtn.addEventListener('click', async ()=>{
+    try{
+      if(!currentUser){ alert('Sign in first'); return; }
+      const seconds = parseInt(overlaySaveBtn.dataset.seconds || elapsedSeconds || 0);
+      await submitScore(currentUser.email, seconds);
+      const newStreak = await updateStreak(currentUser.email);
+      profile = { ...(profile||{}), streak: newStreak };
+      const si = document.getElementById('streakInfo'); if(si) si.textContent = `Streak: ${newStreak}`;
+      alert('Saved! Streak: ' + newStreak);
+      document.getElementById('winOverlay').classList.add('hidden');
+    }catch(e){ console.warn('overlaySave error', e); alert('Save failed'); }
+  });
+
+  /* ---------- Leaderboard / Streaks (server) ---------- */
+  async function submitScore(username, secondsTaken=0){
+    const today = new Date().toISOString().split('T')[0];
+    try{
+      await supabaseClient.from('leaderboard').insert([{ username, score:6, sets_found:6, seconds_taken: secondsTaken, game_date: today }]);
+      fetchLeaderboard();
+    }catch(e){ console.warn('submitScore', e); alert('Failed to save score (see console)'); }
+  }
+
+  async function updateStreak(username){
+    const today = new Date().toISOString().split('T')[0];
+    try{
+      const { data } = await supabaseClient.from('streaks').select('*').eq('username', username).maybeSingle();
+      if(!data){ await supabaseClient.from('streaks').insert([{ username, last_played: today, streak_count: 1 }]); return 1; }
+      const last = data.last_played;
+      const diff = Math.floor((new Date(today) - new Date(last)) / (1000*60*60*24));
+      let newStreak = 1;
+      if(diff === 1) newStreak = data.streak_count + 1;
+      else if(diff === 0) newStreak = data.streak_count;
+      else newStreak = 1;
+      await supabaseClient.from('streaks').update({ streak_count: newStreak, last_played: today }).eq('username', username);
+      return newStreak;
+    }catch(e){ console.warn('updateStreak', e); return null; }
+  }
+
+  async function fetchLeaderboard(){
+    try{
+      const { data } = await supabaseClient.from('leaderboard').select('*').order('seconds_taken',{ascending:true}).order('inserted_at',{ascending:true}).limit(50);
+      renderLeaderboard(data || []);
+      return data;
+    }catch(e){ console.warn('fetchLeaderboard', e); return []; }
+  }
+
+  function renderLeaderboard(rows){
+    const ol = document.getElementById('leaderboardList'); if(!ol) return; ol.innerHTML = '';
+    rows.forEach((r,i)=>{
+      const li = document.createElement('li');
+      const av = r.avatar_url ? `<img src="${r.avatar_url}" class="avatarSmall">` : '';
+      li.innerHTML = `<strong>#${i+1}</strong> ${av}<strong>${r.username}</strong> — <strong>${r.seconds_taken}s</strong> <span class="muted">(${new Date(r.inserted_at).toLocaleDateString()})</span>`;
+      ol.appendChild(li);
+    });
+  }
+
+  /* admin management */
+  async function renderAdminLeaderboard(){
+    const container = document.getElementById('adminLeaderboard'); if(!container) return; container.innerHTML = 'Loading...';
+    try{
+      const { data } = await supabaseClient.from('leaderboard').select('*').order('inserted_at',{ascending:false}).limit(200);
+      container.innerHTML = '';
+      data.forEach(row=>{
+        const d = document.createElement('div');
+        d.style.marginBottom='6px';
+        d.innerHTML = `${row.avatar_url ? `<img src="${row.avatar_url}" class="avatarSmall">` : ''}<strong>${row.username}</strong> — ${row.seconds_taken}s <button onclick="adminDeleteScore(${row.id})" style="margin-left:8px;background:#e11d48">Delete</button>`;
+        container.appendChild(d);
+      });
+    }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed to load</div>'; }
+  }
+  window.adminDeleteScore = async function(id){ if(!confirm('Delete?')) return; try{ await supabaseClient.from('leaderboard').delete().eq('id', id); renderAdminLeaderboard(); fetchLeaderboard(); }catch(e){ console.warn(e); alert('Delete failed'); } }
+
+  /* admin user list */
+  async function renderAdminUserList(){
+    if(!profile?.is_admin) return;
+    const container = document.getElementById('adminUserList'); if(!container) return;
+    container.innerHTML='Loading users...';
+    try{
+      const { data } = await supabaseClient.from('profiles').select('*').limit(200);
+      container.innerHTML = '';
+      data.forEach(u=>{
+        const row = document.createElement('div');
+        row.style.marginBottom='6px';
+        row.innerHTML = `${u.avatar_url ? `<img src="${u.avatar_url}" class="avatarSmall">` : ''}<strong>${u.email}</strong> Streak: ${u.streak || 0} <button style="margin-left:8px" onclick="adminResetPw('${u.email}')">Send reset</button>`;
+        container.appendChild(row);
+      });
+    }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed</div>'; }
+  }
+  window.adminResetPw = function(email){ if(!confirm(`Send password reset to ${email}?`)) return; supabaseClient.auth.resetPasswordForEmail(email).then(()=> alert('Email sent')).catch(e=>{ console.warn(e); alert('Failed'); }); }
+
+  /* ---------- User info + sign-in UI ---------- */
+  function renderUserInfo(){
+    const ui = document.getElementById('userInfo'); if(!ui) return;
+    const avatar = profile?.avatar_url ? `<img src="${profile.avatar_url}" class="avatar">` : (currentUser?.user_metadata?.avatar ? `<img src="${currentUser.user_metadata.avatar}" class="avatar">` : '');
+    const email = profile?.email || currentUser?.email || '';
+    ui.innerHTML = `${avatar}<strong>${email}</strong>`;
+    const si = document.getElementById('streakInfo'); if(si) si.textContent = profile ? `Streak: ${profile.streak || 0}` : '';
+  }
+
+  /* auth completed UI transition */
+  function onSignedIn(){
+    document.getElementById('authCard').style.display = 'none';
+    document.getElementById('gameCard').style.display = '';
+    if(btnSignOut) btnSignOut.style.display = '';
+    if(btnSignIn) btnSignIn.style.display = 'none';
+    if(btnSignUp) btnSignUp.style.display = 'none';
+    const bshare = document.getElementById('btnShare'); if(bshare) bshare.style.display = '';
+    const bsave = document.getElementById('btnSaveScore'); if(bsave) bsave.style.display = '';
+    renderUserInfo();
     fetchLeaderboard();
-  }catch(e){ console.warn('submitScore', e); alert('Failed to save score'); }
-}
+    supabaseClient.from('profiles').upsert({ email: profile.email, avatar_url: profile.avatar_url || chosenAvatar }, { onConflict: ['email'] }).then(()=>{});
+    startGame(!!profile?.is_admin);
+  }
 
-async function updateStreak(username){
-  const today = new Date().toISOString().split('T')[0];
-  try{
-    const { data } = await sb.from('streaks').select('*').eq('username', username).maybeSingle();
-    if(!data){ await sb.from('streaks').insert([{ username, last_played: today, streak_count: 1 }]); return 1; }
-    const last = data.last_played;
-    const diff = Math.floor((new Date(today) - new Date(last)) / (1000*60*60*24));
-    let newStreak = 1;
-    if(diff === 1) newStreak = data.streak_count + 1;
-    else if(diff === 0) newStreak = data.streak_count;
-    else newStreak = 1;
-    await sb.from('streaks').update({ streak_count: newStreak, last_played: today }).eq('username', username);
-    return newStreak;
-  }catch(e){ console.warn('updateStreak', e); return null; }
-}
+  /* start game wiring */
+  const refreshBtn = document.getElementById('btnRefreshLB');
+  refreshBtn && refreshBtn.addEventListener('click', fetchLeaderboard);
 
-async function fetchLeaderboard(){
-  try{
-    const { data } = await sb.from('leaderboard').select('*').order('seconds_taken',{ascending:true}).order('inserted_at',{ascending:true}).limit(50);
-    renderLeaderboard(data || []);
-    return data;
-  }catch(e){ console.warn('fetchLeaderboard', e); return []; }
-}
+  const rerollBtn = document.getElementById('btnReroll');
+  rerollBtn && rerollBtn.addEventListener('click', ()=>{ generateBoard(); renderBoard(); startTimer(); setsFound = 0; });
 
-function renderLeaderboard(rows){
-  const ol = document.getElementById('leaderboardList'); ol.innerHTML='';
-  rows.forEach((r,i)=>{ const li = document.createElement('li'); const av = r.avatar_url ? `<img src="${r.avatar_url}" class="avatarSmall">` : ''; li.innerHTML = `<strong>#${i+1}</strong> ${av}<strong>${r.username}</strong> — <strong>${r.seconds_taken}s</strong> <span class="muted">(${new Date(r.inserted_at).toLocaleDateString()})</span>`; ol.appendChild(li); });
-}
+  const resetProgBtn = document.getElementById('btnResetProgress');
+  resetProgBtn && resetProgBtn.addEventListener('click', ()=>{ setsFound = 0; renderBoard(); });
 
-/* admin management */
-async function renderAdminLeaderboard(){
-  const container = document.getElementById('adminLeaderboard'); container.innerHTML = 'Loading...';
-  try{
-    const { data } = await sb.from('leaderboard').select('*').order('inserted_at',{ascending:false}).limit(200);
-    container.innerHTML = '';
-    data.forEach(row=>{ const d = document.createElement('div'); d.style.marginBottom='6px'; d.innerHTML = `${row.avatar_url ? `<img src="${row.avatar_url}" class="avatarSmall">` : ''}<strong>${row.username}</strong> — ${row.seconds_taken}s <button onclick="adminDeleteScore(${row.id})" style="margin-left:8px;background:#e11d48">Delete</button>`; container.appendChild(d); });
-  }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed to load</div>'; }
-}
-window.adminDeleteScore = async function(id){ if(!confirm('Delete?')) return; try{ await sb.from('leaderboard').delete().eq('id', id); renderAdminLeaderboard(); fetchLeaderboard(); }catch(e){ console.warn(e); alert('Delete failed'); } }
+  const highlightBtn = document.getElementById('btnHighlight');
+  highlightBtn && highlightBtn.addEventListener('click', ()=>{ validSets.forEach(s=> s.forEach(i=> document.querySelector(`[data-index="${i}"]`)?.classList.add('highlighted'))); setTimeout(()=>document.querySelectorAll('.highlighted').forEach(x=>x.classList.remove('highlighted')),5000); });
 
-/* admin user list */
-async function renderAdminUserList(){
-  if(!profile?.is_admin) return;
-  const container = document.getElementById('adminUserList'); container.innerHTML='Loading users...';
-  try{
-    const { data } = await sb.from('profiles').select('*').limit(200);
-    container.innerHTML = '';
-    data.forEach(u=>{ const row=document.createElement('div'); row.style.marginBottom='6px'; row.innerHTML = `${u.avatar_url ? `<img src="${u.avatar_url}" class="avatarSmall">` : ''}<strong>${u.email}</strong> Streak: ${u.streak || 0} <button style="margin-left:8px" onclick="adminResetPw('${u.email}')">Send reset</button>`; container.appendChild(row); });
-  }catch(e){ console.warn(e); container.innerHTML = '<div class="muted">Failed</div>'; }
-}
-window.adminResetPw = function(email){ if(!confirm(`Send password reset to ${email}?`)) return; sb.auth.resetPasswordForEmail(email).then(()=> alert('Email sent')).catch(e=>{ console.warn(e); alert('Failed'); }); }
+  /* admin toggle (Ctrl+Shift+A) */
+  document.addEventListener('keydown', (e)=>{
+    if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()==='a'){
+      if(!profile?.is_admin){ alert('Admin only'); return; }
+      adminMode = !adminMode;
+      const at = document.getElementById('adminTools'); if(at) at.style.display = adminMode ? 'block' : 'none';
+      if(adminMode){ renderAdminUserList(); renderAdminLeaderboard(); }
+    }
+  });
 
-/* ---------- User info + sign-in UI ---------- */
-function renderUserInfo(){ const ui=document.getElementById('userInfo'); ui.innerHTML=''; const avatar = profile?.avatar_url ? `<img src="${profile.avatar_url}" class="avatar">` : (currentUser?.user_metadata?.avatar ? `<img src="${currentUser.user_metadata.avatar}" class="avatar">` : ''); const email = profile?.email || currentUser?.email || ''; ui.innerHTML = `${avatar}<strong>${email}</strong>`; document.getElementById('streakInfo').textContent = profile ? `Streak: ${profile.streak || 0}` : ''; }
+  /* start game function */
+  function startGame(isAdminFlag){
+    adminMode = false;
+    setsFound = 0;
+    loadDailySeed();
+    generateBoard();
+    renderBoard();
+    startTimer(); // start timer when board is loaded
+  }
 
-/* auth completed UI transition */
-function onSignedIn(){
-  document.getElementById('authCard').style.display = 'none';
-  document.getElementById('gameCard').style.display = '';
-  btnSignOut.style.display = '';
-  btnSignIn.style.display = 'none';
-  btnSignUp.style.display = 'none';
-  document.getElementById('btnShare').style.display = '';
-  document.getElementById('btnSaveScore').style.display = '';
-  renderUserInfo();
+  /* initial load */
   fetchLeaderboard();
-  sb.from('profiles').upsert({ email: profile.email, avatar_url: profile.avatar_url || chosenAvatar }, { onConflict: ['email'] });
-  startGame(!!profile?.is_admin);
-}
+  setInterval(fetchLeaderboard, 60_000);
 
-/* start game wiring */
-document.getElementById('btnRefreshLB').addEventListener('click', fetchLeaderboard);
-document.getElementById('btnReroll').addEventListener('click', ()=>{ generateBoard(); renderBoard(); startTimer(); setsFound=0; });
-document.getElementById('btnResetProgress').addEventListener('click', ()=>{ setsFound = 0; renderBoard(); });
-document.getElementById('btnHighlight').addEventListener('click', ()=>{ validSets.forEach(s=> s.forEach(i=> document.querySelector(`[data-index="${i}"]`)?.classList.add('highlighted'))); setTimeout(()=>document.querySelectorAll('.highlighted').forEach(x=>x.classList.remove('highlighted')),5000); });
-
-/* admin toggle (Ctrl+Shift+A) */
-document.addEventListener('keydown', (e)=>{ if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()==='a'){ if(!profile?.is_admin) return alert('Admin only'); adminMode = !adminMode; document.getElementById('adminTools').style.display = adminMode ? 'block' : 'none'; if(adminMode){ renderAdminUserList(); renderAdminLeaderboard(); } } });
-
-/* start game function */
-function startGame(isAdminFlag){
-  adminMode = false;
-  setsFound = 0;
-  loadDailySeed();
-  generateBoard();
-  renderBoard();
-  startTimer(); // start timer when board is loaded
-}
-
-/* initial load */
-fetchLeaderboard();
-setInterval(fetchLeaderboard, 60_000);
-
+}); // DOMContentLoaded end
 </script>
 </body>
 </html>
