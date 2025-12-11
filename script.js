@@ -365,3 +365,5 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setInterval(fetchLeaderboard, 60_000);
 });
 /* =========== end script.js =========== */
+let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+console.log("ERROR:", error);
