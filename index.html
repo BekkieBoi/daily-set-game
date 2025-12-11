@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Daily Set — Full</title>
-
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root{
       --bg:#0b1220; --card:#0f1724; --accent:#60a5fa; --muted:#9aa4b2; --success:#34d399; --danger:#ff6b6b; --glass: rgba(255,255,255,0.04);
@@ -12,15 +12,9 @@
     :root[data-theme="light"]{
       --bg:#eaf3ff; --card:#fff; --accent:#3b82f6; --muted:#667; --success:#22c55e; --danger:#ef4444; --glass: rgba(2,12,30,0.04);
     }
-
     html,body{height:100%;margin:0}
-    body{
-      font-family:Inter,Arial,sans-serif;
-      background:linear-gradient(180deg,var(--bg), #071028 20%);
-      color:var(--muted);
-      margin:0;min-height:100vh;display:flex;gap:18px;align-items:flex-start;padding:20px;box-sizing:border-box;
-    }
-    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 12px 40px rgba(2,12,30,0.35);}
+    body{font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,var(--bg), #071028 20%);color:var(--muted);margin:0;min-height:100vh;display:flex;gap:18px;align-items:flex-start;padding:20px;box-sizing:border-box}
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 12px 40px rgba(2,12,30,0.4)}
     .small{max-width:320px}
     input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass);margin-top:8px;box-sizing:border-box;background:transparent;color:inherit}
     button{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;margin:6px 4px}
@@ -31,7 +25,7 @@
     .selected{border-color:var(--accent);transform:scale(1.02)}
     .correct{border-color:var(--success)}
     .wrong{border-color:var(--danger)}
-    .highlighted{border-color:var(--gold);box-shadow:0 8px 30px rgba(245,197,24,0.08)}
+    .highlighted{border-color:gold;box-shadow:0 8px 30px rgba(245,197,24,0.08)}
     .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,10,20,0.45);z-index:9999}
     .overlay.hidden{display:none}
     .overlayCard{background:var(--card);padding:18px;border-radius:12px;text-align:center;box-shadow:0 20px 60px rgba(2,12,30,0.4);width:min(720px,94%)}
@@ -42,37 +36,30 @@
     @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
     .pop{animation:pop .22s linear}
     @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
-
     /* Leaderboard animation */
     #leaderboardList{padding-left:14px;list-style:none;margin:0}
     .lb-item{opacity:0;transform:translateX(-8px);transition:opacity .35s ease, transform .35s ease}
     .lb-item.visible{opacity:1;transform:none}
-    .small-muted{font-size:0.9rem;color:var(--muted)}
     #darkToggle{background:transparent;border:1px solid var(--glass);padding:6px 10px;border-radius:8px;color:inherit;cursor:pointer}
+    footer{width:100%;text-align:center;color:#888;margin-top:14px}
     @media(max-width:900px){body{flex-direction:column;padding:12px}}
   </style>
 </head>
-
 <body data-theme="dark">
-
- <!-- AUTH -->
-<div id="authCard" class="card small fade-in" aria-live="polite">
-  <h2>Daily Set</h2>
-
-  <input id="email" type="email" placeholder="Email" />
-  <input id="password" type="password" placeholder="Password" />
-
-  <div style="margin-top:8px;display:flex;gap:8px">
-    <button id="btnSignIn">Sign in</button>
-    <button id="btnSignUp" style="background:#10b981">Create account</button>
-    <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
+  <!-- AUTH -->
+  <div id="authCard" class="card small fade-in" aria-live="polite">
+    <h2>Daily Set</h2>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <div style="margin-top:8px;display:flex;gap:8px">
+      <button id="btnSignIn">Sign in</button>
+      <button id="btnSignUp" style="background:#10b981">Create account</button>
+      <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
+    </div>
+    <p id="authMsg" style="height:18px;margin:6px 0 0 0;"></p>
+    <div id="presetAvatars" style="display:flex;gap:8px;margin-top:12px"></div>
+    <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
   </div>
-
-  <p id="authMsg" style="height:18px;margin:6px 0 0 0;"></p>
-
-  <div id="presetAvatars" style="display:flex;gap:8px;margin-top:12px"></div>
-  <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
-</div>
 
   <!-- GAME -->
   <div id="gameCard" class="card fade-in" style="flex:1;display:none">
