@@ -1,5 +1,6 @@
 typeof supabase
   window.supabase
+console.log("script.js loaded");
 
 /* =========== script.js (merged, all upgrades) =========== */
 /* Replace these with your Supabase values */
