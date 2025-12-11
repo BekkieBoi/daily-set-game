@@ -101,6 +101,138 @@
       <canvas id="confetti" style="margin-top:8px;width:100%;height:140px"></canvas>
     </div>
   </div>
+// ---------------- Supabase Setup ----------------
+const SUPABASE_URL = "YOUR_URL";
+const SUPABASE_KEY = "YOUR_PUBLIC_KEY";
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------------- Page Elements ----------------
+const loginBox = document.getElementById("loginContainer");
+const gameBox = document.getElementById("gameContainer");
+const adminBox = document.getElementById("adminTools");
+
+// Hide everything until session loads
+gameBox.style.display = "none";
+if (adminBox) adminBox.style.display = "none";
+
+// ---------------- Helper: Redirect if logged out ----------------
+async function requireLogin() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+        // Not logged in → show login page
+        loginBox.style.display = "block";
+        gameBox.style.display = "none";
+        return false;
+    }
+
+    loginBox.style.display = "none";
+    gameBox.style.display = "block";
+    return true;
+}
+
+// ---------------- Helper: Check Admin Role ----------------
+async function requireAdmin() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return false;
+
+    const user = session.user;
+
+    // Fetch role from the "users" table
+    const { data } = await supabaseClient
+        .from("users")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+
+    const isAdmin = data?.is_admin === true;
+
+    if (isAdmin && adminBox) {
+        adminBox.style.display = "block";
+    }
+
+    return isAdmin;
+}
+
+// ---------------- Login Function ----------------
+async function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const msg = document.getElementById("loginMessage");
+
+    if (!username || !password) {
+        msg.textContent = "Enter username and password.";
+        return;
+    }
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: username + "@nosmtp.fake",  // fake emails = instant login
+        password: password
+    });
+
+    if (error) {
+        msg.textContent = "Invalid login.";
+        return;
+    }
+
+    msg.textContent = "";
+    startGame();         // Your game function
+    requireAdmin();      // enable admin tools if admin
+}
+
+// ---------------- Register Function ----------------
+async function register() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const msg = document.getElementById("loginMessage");
+
+    if (!username || !password) {
+        msg.textContent = "Enter username and password.";
+        return;
+    }
+
+    // Create a fake email
+    const email = username + "@nosmtp.fake";
+
+    const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password
+    });
+
+    if (error) {
+        msg.textContent = "Could not create account.";
+        return;
+    }
+
+    // Insert into user roles table
+    await supabaseClient.from("users").insert({
+        id: data.user.id,
+        username: username,
+        is_admin: false
+    });
+
+    msg.style.color = "green";
+    msg.textContent = "Account created! You can log in.";
+}
+
+// ---------------- Sign Out Button ----------------
+async function signOut() {
+    await supabaseClient.auth.signOut();
+    location.reload();  // reset to login
+}
+
+// Add this button to your HTML:
+// <button onclick="signOut()">Sign Out</button>
+
+
+// ---------------- Auto-check session on page load ----------------
+document.addEventListener("DOMContentLoaded", async () => {
+    const loggedIn = await requireLogin();
+    if (loggedIn) {
+        startGame();
+        requireAdmin();
+    }
+});
 
 <script>
 window.addEventListener('DOMContentLoaded', () => {
