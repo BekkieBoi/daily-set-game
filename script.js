@@ -3,7 +3,7 @@
 const SUPABASE_URL = "https://xmqstvgrqtllyvdehync.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = supabase.createClient(https://xmqstvgrqtllyvdehync.supabase.co, sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P);
 
 /* ---------- simple theme toggle ---------- */
 const darkToggle = document.getElementById('darkToggle');
