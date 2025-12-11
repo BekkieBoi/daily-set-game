@@ -1,3 +1,6 @@
+typeof supabase
+  window.supabase
+
 /* =========== script.js (merged, all upgrades) =========== */
 /* Replace these with your Supabase values */
 const SUPABASE_URL = "https://xmqstvgrqtllyvdehync.supabase.co"; // <- your project url
