@@ -1,7 +1,7 @@
 /* =========== script.js =========== */
 /* Replace these with your Supabase values */
-const SUPABASE_URL = "REPLACE_WITH_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "REPLACE_WITH_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://xmqstvgrqtllyvdehync.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P";
 
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
