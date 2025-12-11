@@ -54,70 +54,137 @@ document.getElementById('uploadAvatar')?.addEventListener('change', async (e)=>{
   }catch(err){ console.warn('upload failed',err); alert('Avatar upload failed'); }
 });
 
-/* ---------- Auth wiring ---------- */
+/* ---------- Buttons ---------- */
 const btnSignUp = document.getElementById('btnSignUp');
 const btnSignIn = document.getElementById('btnSignIn');
 const btnSignOut = document.getElementById('btnSignOut');
 const authMsg = document.getElementById('authMsg');
-
 let currentUser = null;
 let profile = null;
+let chosenAvatar = null;
 
-function showAuth(msg, error=false){ if(!authMsg) return; authMsg.textContent = msg; authMsg.style.color = error? 'crimson':'var(--muted)'; }
-
-/* sign up */
-btnSignUp?.addEventListener('click', async ()=>{
-  const email = document.getElementById('email').value.trim();
-  const pw = document.getElementById('password').value;
-  if(!email || !pw){ showAuth('Enter email and password', true); return; }
-  showAuth('Creating account...');
-  try{
-    const res = await supabase.auth.signUp({ email, password: pw, options: { data: { avatar: chosenAvatar } } });
-    if(res.error){ showAuth(res.error.message, true); return; }
-    await supabase.from('profiles').upsert({ email, avatar_url: chosenAvatar, streak:0 }, { onConflict: ['email'] });
-    showAuth('Account created — confirm email then sign in (disable confirmations in Supabase for instant).');
-  }catch(e){ console.error(e); showAuth('Sign up failed', true); }
-});
-
-/* sign in */
-btnSignIn?.addEventListener('click', async ()=>{
-  const email = document.getElementById('email').value.trim();
-  const pw = document.getElementById('password').value;
-  if(!email || !pw){ showAuth('Enter email and password', true); return; }
-  showAuth('Signing in...');
-  try{
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
-    if(error){ showAuth(error.message, true); return; }
-    currentUser = data.user; await loadProfile(); onSignedIn(); showAuth('Signed in');
-  }catch(e){ console.error('signIn err', e); showAuth('Sign in failed', true); }
-});
-
-/* sign out */
-btnSignOut?.addEventListener('click', async ()=>{
-  try{
-    await supabase.auth.signOut();
-    currentUser = null; profile = null;
-    document.getElementById('authCard').style.display=''; document.getElementById('gameCard').style.display='none';
-    btnSignOut.style.display='none'; btnSignIn.style.display=''; btnSignUp.style.display='';
-    showAuth('Signed out');
-  }catch(e){ console.warn('signOut err', e); showAuth('Sign out failed', true); }
-});
-
-/* auth state */
-supabase.auth.onAuthStateChange((event, session) => {
-  if(session?.user){ currentUser = session.user; loadProfile().then(()=> onSignedIn()).catch(e=>console.warn(e)); }
-  else { currentUser = null; }
-});
-
-async function loadProfile(){
-  if(!currentUser) return;
-  try{
-    const { data, error } = await supabase.from('profiles').select('*').eq('email', currentUser.email).maybeSingle();
-    if(error) console.warn('profile fetch error', error);
-    if(!data){ await supabase.from('profiles').insert({ email: currentUser.email, avatar_url: chosenAvatar, streak:0 }); profile = { email: currentUser.email, avatar_url: chosenAvatar, streak:0, is_admin:false }; }
-    else profile = data;
-  }catch(e){ console.warn('loadProfile error', e); }
+/* helper */
+function showAuth(msg, error=false){
+  authMsg.textContent = msg;
+  authMsg.style.color = error ? "crimson" : "var(--muted)";
 }
+
+/* redirect handler */
+async function onSignedIn() {
+  document.getElementById("authCard").style.display = "none";
+  document.getElementById("gameCard").style.display = "block";
+
+  btnSignOut.style.display = "";
+  btnSignIn.style.display = "none";
+  btnSignUp.style.display = "none";
+}
+
+/* load profile */
+async function loadProfile(){
+  const { data } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", currentUser.id)
+    .single();
+
+  profile = data;
+}
+
+/* ---------- SIGN UP ---------- */
+btnSignUp.addEventListener("click", async () => {
+  const email = document.getElementById("email").value.trim();
+  const pw = document.getElementById("password").value;
+
+  if (!email || !pw) {
+    showAuth("Enter email and password", true);
+    return;
+  }
+
+  showAuth("Creating account...");
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password: pw,
+    options: {
+      emailRedirectTo: null,
+      data: { avatar: chosenAvatar }
+    }
+  });
+
+  if (error) {
+    showAuth(error.message, true);
+    return;
+  }
+
+  // Insert user profile
+  await supabase.from("profiles").upsert({
+    id: data.user.id,
+    email,
+    avatar_url: chosenAvatar,
+    streak: 0
+  });
+
+  showAuth("Account created — you can sign in now!");
+});
+
+/* ---------- SIGN IN ---------- */
+btnSignIn.addEventListener("click", async () => {
+  const email = document.getElementById("email").value.trim();
+  const pw = document.getElementById("password").value;
+
+  if (!email || !pw) {
+    showAuth("Enter email and password", true);
+    return;
+  }
+
+  showAuth("Signing in...");
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: pw
+  });
+
+  if (error) {
+    showAuth(error.message, true);
+    return;
+  }
+
+  currentUser = data.user;
+  await loadProfile();
+  showAuth("Signed in");
+
+  onSignedIn();
+});
+
+/* ---------- SIGN OUT ---------- */
+btnSignOut.addEventListener("click", async () => {
+  await supabase.auth.signOut();
+
+  currentUser = null;
+  profile = null;
+
+  document.getElementById("authCard").style.display = "";
+  document.getElementById("gameCard").style.display = "none";
+
+  btnSignOut.style.display = "none";
+  btnSignIn.style.display = "";
+  btnSignUp.style.display = "";
+
+  showAuth("Signed out");
+});
+
+/* ---------- Auto login check ---------- */
+(async () => {
+  const {
+    data: { session }
+  } = await supabase.auth.getSession();
+
+  if (session?.user) {
+    currentUser = session.user;
+    await loadProfile();
+    onSignedIn();
+  }
+})();
 
 /* ---------- Game logic (same core) ---------- */
 const numbers=["One","Two","Three"], shapes=["Oval","Diamond","Squiggle"], colors=["Red","Green","Purple"], fills=["Solid","Striped","Open"];
