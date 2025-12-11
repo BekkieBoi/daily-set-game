@@ -55,20 +55,24 @@
 
 <body data-theme="dark">
 
-  <!-- AUTH -->
-  <div id="authCard" class="card small fade-in" aria-live="polite">
-    <h2>Daily Set</h2>
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-    <div style="margin-top:8px;display:flex;gap:8px">
-      <button id="btnSignIn">Sign in</button>
-      <button id="btnSignUp" style="background:#10b981">Create account</button>
-      <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
-    </div>
-    <p id="authMsg" style="height:18px;margin:6px 0 0 0;"></p>
-    <div id="presetAvatars" style="display:flex;gap:8px;margin-top:12px"></div>
-    <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
+ <!-- AUTH -->
+<div id="authCard" class="card small fade-in" aria-live="polite">
+  <h2>Daily Set</h2>
+
+  <input id="email" type="email" placeholder="Email" />
+  <input id="password" type="password" placeholder="Password" />
+
+  <div style="margin-top:8px;display:flex;gap:8px">
+    <button id="btnSignIn">Sign in</button>
+    <button id="btnSignUp" style="background:#10b981">Create account</button>
+    <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
   </div>
+
+  <p id="authMsg" style="height:18px;margin:6px 0 0 0;"></p>
+
+  <div id="presetAvatars" style="display:flex;gap:8px;margin-top:12px"></div>
+  <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
+</div>
 
   <!-- GAME -->
   <div id="gameCard" class="card fade-in" style="flex:1;display:none">
