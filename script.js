@@ -5,6 +5,11 @@ const SUPABASE_ANON_KEY = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P"; // <
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+window.supabase = supabase.createClient(
+  "YOUR_SUPABASE_URL",
+  "YOUR_SUPABASE_ANON_KEY"
+);
+
 /* ---------- Theme toggle ---------- */
 const darkToggle = document.getElementById('darkToggle');
 darkToggle?.addEventListener('click', () => {
