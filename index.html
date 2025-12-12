@@ -1,127 +1,94 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Daily Set — Full</title>
+  <title>Daily Set — Working Auth Version</title>
 
-  <!-- Supabase client CDN (must load BEFORE script.js) -->
+  <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Your app script -->
-  <script src="script.js" defer></script>
+  <!-- external JS file (fixed closing tag) -->
+  <script defer src="script.js"></script>
 
   <style>
     :root{
-      --bg:#0b1220; --card:#0f1724; --accent:#60a5fa; --muted:#9aa4b2; --success:#34d399; --danger:#ff6b6b; --glass: rgba(255,255,255,0.04);
+      --bg:#0b1220; --card:#0f1724; --accent:#60a5fa; --muted:#9aa4b2;
+      --success:#34d399; --danger:#ff6b6b; --glass: rgba(255,255,255,0.04);
     }
     :root[data-theme="light"]{
-      --bg:#eaf3ff; --card:#fff; --accent:#3b82f6; --muted:#667; --success:#22c55e; --danger:#ef4444; --glass: rgba(2,12,30,0.04);
+      --bg:#eaf3ff; --card:#ffffff; --accent:#3b82f6; --muted:#667;
+      --success:#22c55e; --danger:#ef4444; --glass: rgba(2,12,30,0.04);
     }
     html,body{height:100%;margin:0}
-    body{font-family:Inter,Arial,sans-serif;background:linear-gradient(180deg,var(--bg), #071028 20%);color:var(--muted);margin:0;min-height:100vh;display:flex;gap:18px;align-items:flex-start;padding:20px;box-sizing:border-box}
-    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 12px 40px rgba(2,12,30,0.4)}
+    body{
+      font-family:Inter,Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg), #071028 20%);
+      color:var(--muted);
+      display:flex;gap:18px;padding:20px;
+      min-height:100vh;box-sizing:border-box;
+    }
+
+    .card{background:var(--card);padding:16px;border-radius:12px;
+      box-shadow:0 12px 40px rgba(2,12,30,0.4)}
+
     .small{max-width:320px}
-    input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass);margin-top:8px;box-sizing:border-box;background:transparent;color:inherit}
-    button{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;margin:6px 4px}
-    .muted{color:var(--muted)}
-    #cardGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
-    .cardTile{padding:12px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);cursor:pointer;transition:transform .14s,box-shadow .14s,border .14s;border:2px solid transparent;user-select:none;min-height:82px;display:flex;flex-direction:column;justify-content:center;align-items:center}
-    .cardTile:hover{transform:translateY(-6px)}
-    .selected{border-color:var(--accent);transform:scale(1.02)}
-    .correct{border-color:var(--success)}
-    .wrong{border-color:var(--danger)}
-    .highlighted{border-color:gold;box-shadow:0 8px 30px rgba(245,197,24,0.08)}
-    .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(4,10,20,0.45);z-index:9999}
-    .overlay.hidden{display:none}
-    .overlayCard{background:var(--card);padding:18px;border-radius:12px;text-align:center;box-shadow:0 20px 60px rgba(2,12,30,0.4);width:min(720px,94%)}
-    .avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px}
-    .avatarSmall{width:24px;height:24px;border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle}
-    .topRow{display:flex;justify-content:space-between;align-items:center}
-    .fade-in{animation:fadeIn .28s ease both}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-    .pop{animation:pop .22s linear}
-    @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
-    /* Leaderboard animation */
-    #leaderboardList{padding-left:14px;list-style:none;margin:0}
-    .lb-item{opacity:0;transform:translateX(-8px);transition:opacity .35s ease, transform .35s ease}
+
+    input,select{
+      width:100%;padding:10px;border-radius:8px;
+      border:1px solid var(--glass);margin-top:8px;
+      background:transparent;color:inherit;
+    }
+    button{
+      background:var(--accent);color:white;border:0;
+      padding:8px 12px;border-radius:8px;cursor:pointer;
+      font-weight:600;margin:6px 4px;
+    }
+
+    /* leaderboard */
+    #leaderboardList{list-style:none;padding-left:14px;margin:0}
+    .lb-item{opacity:0;transform:translateX(-8px);
+      transition:opacity .35s ease,transform .35s ease}
     .lb-item.visible{opacity:1;transform:none}
-    #darkToggle{background:transparent;border:1px solid var(--glass);padding:6px 10px;border-radius:8px;color:inherit;cursor:pointer}
-    footer{width:100%;text-align:center;color:#888;margin-top:14px}
-    @media(max-width:900px){body{flex-direction:column;padding:12px}}
+
+    #darkToggle{
+      background:transparent;border:1px solid var(--glass);
+      padding:6px 10px;border-radius:8px;cursor:pointer;color:inherit;
+    }
+    .fade-in{animation:fadeIn .28s ease both}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
   </style>
 </head>
-<body data-theme="dark">
+
+<body>
+
   <!-- AUTH -->
-  <div id="authCard" class="card small fade-in" aria-live="polite">
+  <div id="authCard" class="card small fade-in">
     <h2>Daily Set</h2>
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-    <div style="margin-top:8px;display:flex;gap:8px">
+    <input id="email" type="email" placeholder="Email"/>
+    <input id="password" type="password" placeholder="Password"/>
+
+    <div style="display:flex;gap:8px;margin-top:8px">
       <button id="btnSignIn">Sign in</button>
-      <button id="btnSignUp" style="background:#10b981">Create account</button>
+      <button id="btnSignUp" style="background:#10b981">Create</button>
       <button id="btnSignOut" style="display:none;background:#8899b2">Sign out</button>
     </div>
-    <p id="authMsg" style="height:18px;margin:6px 0 0 0;"></p>
+
+    <p id="authMsg" style="height:18px;margin-top:6px"></p>
+
     <div id="presetAvatars" style="display:flex;gap:8px;margin-top:12px"></div>
     <input id="uploadAvatar" type="file" accept="image/*" style="margin-top:8px"/>
   </div>
 
-  <!-- GAME -->
-  <div id="gameCard" class="card fade-in" style="flex:1;display:none">
+  <!-- GAME PANEL -->
+  <div id="gameCard" class="card fade-in" style="display:none;min-width:420px">
     <div class="topRow">
-      <div>
-        <h2 style="margin:0">Daily Set</h2>
-        <div id="userInfo" class="muted" style="margin-top:6px"></div>
-      </div>
-      <div style="text-align:right">
-        <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">
-          <button id="darkToggle" title="Toggle theme">Dark</button>
-          <button id="btnShare" style="display:none">Share</button>
-          <button id="btnSaveScore" style="display:none">Save</button>
-        </div>
-        <div style="margin-top:6px">Timer: <strong id="timerDisplay">0s</strong></div>
-      </div>
+      <h3>Hello, <span id="playerEmail"></span></h3>
+      <button id="darkToggle">Toggle Theme</button>
     </div>
 
-    <p style="margin-top:10px">Find all 6 sets for today's puzzle.</p>
-    <p>Sets found: <strong id="foundCount">0</strong>/6</p>
-    <div id="cardGrid" class="fade-in" aria-live="polite"></div>
-    <p id="status" class="muted"></p>
-
-    <div id="adminTools" style="display:none;margin-top:12px">
-      <h4>Admin Tools</h4>
-      <button id="btnReroll">Re-roll Board</button>
-      <button id="btnResetProgress">Reset Progress</button>
-      <button id="btnHighlight">Highlight Sets</button>
-      <div id="adminUserList" style="margin-top:10px"></div>
-      <div style="margin-top:8px">
-        <h5>Leaderboard Management</h5>
-        <div id="adminLeaderboard" style="max-height:220px;overflow:auto"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Leaderboard -->
-  <aside class="card small fade-in" id="leaderboardCard">
     <h3>Leaderboard</h3>
-    <ol id="leaderboardList"></ol>
-    <button id="btnRefreshLB">Refresh</button>
-  </aside>
-
-  <!-- Win overlay -->
-  <div id="winOverlay" class="overlay hidden" aria-hidden="true">
-    <div class="overlayCard">
-      <h2 id="winTitle">🎉 You found all 6 sets!</h2>
-      <p id="winDetail" class="muted"></p>
-      <div style="margin-top:12px">
-        <button id="overlayShare">Share</button>
-        <button id="overlaySave" disabled>Save</button>
-        <button id="overlayClose" style="background:#8899b2">Close</button>
-      </div>
-      <canvas id="shareCanvas" style="display:none"></canvas>
-      <canvas id="confetti" style="margin-top:8px;width:100%;height:140px"></canvas>
-    </div>
+    <ul id="leaderboardList"></ul>
   </div>
 
 </body>
