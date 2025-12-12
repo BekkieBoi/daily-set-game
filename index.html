@@ -4,8 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Daily Set — Full</title>
+
+  <!-- Supabase client CDN (must load BEFORE script.js) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js"><script>
+
+  <!-- Your app script -->
+  <script src="script.js" defer></script>
+
   <style>
     :root{
       --bg:#0b1220; --card:#0f1724; --accent:#60a5fa; --muted:#9aa4b2; --success:#34d399; --danger:#ff6b6b; --glass: rgba(255,255,255,0.04);
@@ -119,6 +124,5 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
 </body>
 </html>
