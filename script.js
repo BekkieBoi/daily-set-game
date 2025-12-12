@@ -1,18 +1,12 @@
-typeof supabase
-  window.supabase
-console.log("script.js loaded");
-
 /* =========== script.js (merged, all upgrades) =========== */
-/* Replace these with your Supabase values */
-const SUPABASE_URL = "https://xmqstvgrqtllyvdehync.supabase.co"; // <- your project url
-const SUPABASE_ANON_KEY = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P"; // <- your anon key
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ========== REPLACE THESE WITH YOUR SUPABASE VALUES ========== */
+const SUPABASE_URL = "REPLACE_WITH_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "REPLACE_WITH_SUPABASE_ANON_KEY";
+/* ============================================================ */
 
-window.supabase = supabase.createClient(
-  "YOUR_SUPABASE_URL",
-  "YOUR_SUPABASE_ANON_KEY"
-);
+/* initialize client on window so checks like `window.supabase` work */
+window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ---------- Theme toggle ---------- */
 const darkToggle = document.getElementById('darkToggle');
@@ -32,6 +26,8 @@ const PRESETS = [
   "https://api.dicebear.com/6.x/thumbs/svg?seed=robot"
 ];
 let chosenAvatar = PRESETS[0];
+
+/* render avatar presets */
 function renderPresets(){
   const root = document.getElementById('presetAvatars'); if(!root) return; root.innerHTML='';
   PRESETS.forEach(url=>{
@@ -42,6 +38,7 @@ function renderPresets(){
   });
 }
 renderPresets();
+
 document.getElementById('uploadAvatar')?.addEventListener('change', async (e)=>{
   const f = e.target.files?.[0]; if(!f) return;
   if(!currentUser){
@@ -60,7 +57,7 @@ document.getElementById('uploadAvatar')?.addEventListener('change', async (e)=>{
   }catch(err){ console.warn('upload failed',err); alert('Avatar upload failed'); }
 });
 
-/* ---------- Auth wiring (fixed) ---------- */
+/* ---------- Auth wiring ---------- */
 const btnSignUp = document.getElementById('btnSignUp');
 const btnSignIn = document.getElementById('btnSignIn');
 const btnSignOut = document.getElementById('btnSignOut');
@@ -95,9 +92,8 @@ async function loadProfile(){
 
 /* onSignedIn UI */
 function onSignedIn(){
-  document.getElementById('authCard').style.display='';
-  document.getElementById('authCard').style.display = 'none'; // hide
-  document.getElementById('gameCard').style.display = ''; // show
+  document.getElementById('authCard').style.display = 'none';
+  document.getElementById('gameCard').style.display = '';
   if(btnSignOut) btnSignOut.style.display = '';
   if(btnSignIn) btnSignIn.style.display = 'none';
   if(btnSignUp) btnSignUp.style.display = 'none';
@@ -160,7 +156,7 @@ supabase.auth.onAuthStateChange((event, session) => {
   else { currentUser = null; }
 });
 
-/* ---------- Game logic (unchanged core) ---------- */
+/* ---------- Game logic (core) ---------- */
 const numbers=["One","Two","Three"], shapes=["Oval","Diamond","Squiggle"], colors=["Red","Green","Purple"], fills=["Solid","Striped","Open"];
 let cards=[], selected=[], validSets=[], setsFound=0, dailySeed=0, adminMode=false;
 let timerInterval=null, startTime=null, elapsedSeconds=0;
@@ -245,7 +241,7 @@ document.getElementById('overlayShare').addEventListener('click', async ()=>{
   img.onerror = ()=> alert('Could not load avatar to create share image.');
 });
 
-/* ---------- Leaderboard / streaks (server) ---------- */
+/* ---------- Leaderboard / streaks / server ---------- */
 async function submitScore(username, secondsTaken=0){
   const today = new Date().toISOString().split('T')[0];
   try{ await supabase.from('leaderboard').insert([{ username, avatar_url: profile?.avatar_url || null, score:6, sets_found:6, seconds_taken: secondsTaken, game_date: today }]); await fetchLeaderboard(); }
@@ -325,4 +321,35 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   fetchLeaderboard();
   setInterval(fetchLeaderboard, 60_000);
 });
-/* =========== end script.js =========== */
+
+/* ========== END script.js ========== */
+
+/*
+Optional SQL (run in Supabase SQL editor):
+
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text unique,
+  avatar_url text,
+  streak int8 default 0,
+  is_admin boolean default false
+);
+
+create table if not exists leaderboard (
+  id bigserial primary key,
+  username text,
+  avatar_url text,
+  score int,
+  sets_found int,
+  seconds_taken int,
+  game_date date,
+  inserted_at timestamptz default now()
+);
+
+create table if not exists streaks (
+  id bigserial primary key,
+  username text unique,
+  last_played date,
+  streak_count int
+);
+*/
