@@ -1,53 +1,76 @@
 body {
-  background: #f3f3f3;
-  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+  font-family: Arial;
+  margin: 0;
   padding: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .card {
   background: white;
   padding: 20px;
-  margin: auto;
-  max-width: 420px;
+  width: 350px;
   border-radius: 12px;
-  box-shadow: 0 0 10px #0002;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 
-.hidden { display: none; }
+.hidden {
+  display: none;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
 
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
-.gameCard {
-  padding: 12px;
-  border: 2px solid #aaa;
-  cursor: pointer;
-  border-radius: 8px;
-}
-
-.gameCard.selected {
-  border-color: #0099ff;
-}
-
-.gameCard.correct { border-color: #00cc44; }
-.gameCard.wrong { border-color: #ff4444; }
-.gameCard.removed { opacity: 0.2; }
-
-.buttonRow {
+.gameCard .infoRow {
   display: flex;
-  gap: 10px;
+  justify-content: space-between;
 }
+
+.card .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.card .symbol {
+  margin: 2px;
+}
+
+.card .symbols {
+  display: flex;
+  justify-content: center;
+}
+
+.card.selected {
+  outline: 3px solid #5fa8ff;
+}
+
+.card.correct {
+  background: #d7ffe0;
+}
+
+.card.wrong {
+  background: #ffd4d4;
+}
+
 button {
   padding: 10px;
-  flex: 1;
+  border-radius: 8px;
   border: none;
-  border-radius: 6px;
   cursor: pointer;
+  flex: 1;
 }
-.green { background: #44c767; color: white; }
-.blue { background: #3b7bff; color: white; }
-.gray { background: #aaa; color: white; }
+
+.green { background: #59d36c; color: white; }
+.gray  { background: #ccc; }
+.blue  { background: #4c8df5; color: white; }
