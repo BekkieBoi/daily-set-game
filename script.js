@@ -1,91 +1,56 @@
 /* ============================================================
    CONFIG
 ============================================================ */
-const supabaseUrl = "https://xmqstvgrqtllyvdehync.supabase.co"; 
+const supabaseUrl = "https://xmqstvgrqtllyvdehync.supabase.co";
 const supabaseKey = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P";
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
+const AUTH_COOLDOWN_HOURS = 1;
+
 /* ============================================================
-   ELEMENTS
+   ELEMENTS — unified IDs
 ============================================================ */
-const authPanel = document.getElementById("authPanel");
-const gamePanel = document.getElementById("gamePanel");
-const leaderboardPanel = document.getElementById("leaderboardPanel");
+const authCard      = document.getElementById("authCard");
+const gameCard      = document.getElementById("gameCard");
+const adminCard     = document.getElementById("adminCard");
 
-const emailEl = document.getElementById("email");
-const passEl = document.getElementById("password");
-const authMsg = document.getElementById("authMsg");
+const authEmail     = document.getElementById("authEmail");
+const authPassword  = document.getElementById("authPassword");
+const authMessage   = document.getElementById("authMessage");
 
-const btnLogin = document.getElementById("btnLogin");
-const btnSignup = document.getElementById("btnSignup");
-const btnLogout = document.getElementById("btnLogout");
-const btnSubmit = document.getElementById("btnSubmitScore");
+const btnSignIn     = document.getElementById("btnSignIn");
+const btnSignUp     = document.getElementById("btnSignUp");
+const btnSignOut    = document.getElementById("btnSignOut");
 
-const timerEl = document.getElementById("timer");
-const mistakesEl = document.getElementById("mistakes");
-const foundCountEl = document.getElementById("foundCount");
-const grid = document.getElementById("grid");
+const btnSubmitScore = document.getElementById("btnSubmitScore");
+const btnBackToGame  = document.getElementById("btnBackToGame");
+
+const timerEl       = document.getElementById("timer");
+const errorsEl      = document.getElementById("errors");
+const setsFoundEl   = document.getElementById("setsFound");
+const dailyStatus   = document.getElementById("dailyStatus");
+
+const gridEl        = document.getElementById("grid");
+
+const adminScores   = document.getElementById("adminScores");
 
 /* ============================================================
    GAME STATE
 ============================================================ */
 let deck = [];
+let cards = [];
 let selected = [];
 let mistakes = 0;
-let foundSets = 0;
+let setsFound = 0;
+
 let timer = 0;
 let timerInterval = null;
 
 const shapes = ["circle", "square", "triangle"];
 const colors = ["red", "green", "blue"];
-const fills = ["empty", "stripe", "solid"];
+const fills  = ["empty", "stripe", "solid"];
 const counts = [1, 2, 3];
 
-/* ============================================================
-   LOGIN / SIGNUP
-============================================================ */
-btnLogin.onclick = async () => {
-  const { error } = await supabase.auth.signInWithPassword({
-    email: emailEl.value,
-    password: passEl.value
-  });
-  if (error) authMsg.textContent = error.message;
-};
-
-btnSignup.onclick = async () => {
-  const { error } = await supabase.auth.signUp({
-    email: emailEl.value,
-    password: passEl.value
-  });
-  if (error) authMsg.textContent = error.message;
-};
-
-/* ============================================================
-   AUTH STATE
-============================================================ */
-supabase.auth.onAuthStateChange(async (_, session) => {
-  if (session && session.user)
-    showGame();
-  else
-    showAuth();
-});
-
-function showAuth() {
-  authPanel.classList.remove("hidden");
-  gamePanel.classList.add("hidden");
-}
-
-function showGame() {
-  authPanel.classList.add("hidden");
-  gamePanel.classList.remove("hidden");
-  startDaily();
-}
-
-btnLogout.onclick = () => supabase.auth.signOut();
-
-/* ============================================================
-   CARD GENERATION
-============================================================ */
 function generateDeck() {
   const d = [];
   for (let s of shapes)
@@ -97,135 +62,195 @@ function generateDeck() {
 }
 
 /* ============================================================
-   SET CHECK
+   AUTH — SIGN IN / SIGN UP / SIGN OUT
 ============================================================ */
-function eq(a,b,c){ return a===b && b===c; }
-function diff(a,b,c){ return a!==b && a!==c && b!==c; }
+btnSignIn.onclick = async () => {
+  const { error } = await supabase.auth.signInWithPassword({
+    email: authEmail.value,
+    password: authPassword.value
+  });
+  authMessage.textContent = error ? error.message : "Logged in!";
+  if (!error) loadSession();
+};
 
-function isSet(a,b,c) {
-  return (
-    (eq(a.shape,b.shape,c.shape)||diff(a.shape,b.shape,c.shape)) &&
-    (eq(a.color,b.color,c.color)||diff(a.color,b.color,c.color)) &&
-    (eq(a.fill,b.fill,c.fill)||diff(a.fill,b.fill,c.fill)) &&
-    (eq(a.count,b.count,c.count)||diff(a.count,b.count,c.count))
+btnSignUp.onclick = async () => {
+  const { error } = await supabase.auth.signUp({
+    email: authEmail.value,
+    password: authPassword.value
+  });
+  authMessage.textContent = error ? error.message : "Account created!";
+};
+
+btnSignOut.onclick = async () => {
+  await supabase.auth.signOut();
+  showAuth();
+};
+
+/* ============================================================
+   SESSION CHECK
+============================================================ */
+async function loadSession() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return showAuth();
+
+  if (user.user_metadata?.role === "admin") showAdmin();
+  else showGame();
+}
+
+function showAuth() {
+  authCard.classList.remove("hidden");
+  gameCard.classList.add("hidden");
+  adminCard.classList.add("hidden");
+}
+
+function showGame() {
+  authCard.classList.add("hidden");
+  adminCard.classList.add("hidden");
+  gameCard.classList.remove("hidden");
+
+  startGame();
+}
+
+function showAdmin() {
+  authCard.classList.add("hidden");
+  gameCard.classList.add("hidden");
+  adminCard.classList.remove("hidden");
+  loadAdminScores();
+}
+
+btnBackToGame.onclick = showGame;
+
+/* ============================================================
+   ONE-HOUR WRITE COOLDOWN
+============================================================ */
+function canWrite() {
+  const last = localStorage.getItem("lastWrite");
+  if (!last) return true;
+
+  const diff = (Date.now() - Number(last)) / (1000 * 60 * 60);
+  return diff >= AUTH_COOLDOWN_HOURS;
+}
+
+function recordWrite() {
+  localStorage.setItem("lastWrite", Date.now());
+}
+
+/* ============================================================
+   GAME LOGIC — OPTION E (6 SETS NEEDED)
+============================================================ */
+function startGame() {
+  mistakes = 0;
+  setsFound = 0;
+  errorsEl.textContent = "0";
+  setsFoundEl.textContent = "0/6";
+
+  deck = generateDeck();
+  shuffle(deck);
+
+  cards = deck.slice(0, 12);
+
+  renderGrid();
+
+  startTimer();
+}
+
+function renderGrid() {
+  gridEl.innerHTML = cards.map((c, i) => renderCard(c, i)).join("");
+
+  document.querySelectorAll(".cardItem").forEach(el =>
+    el.onclick = onCardClick
   );
 }
 
-function countSets(cards) {
-  let total = 0;
-  for (let i=0;i<12;i++)
-    for (let j=i+1;j<12;j++)
-      for (let k=j+1;k<12;k++)
-        if (isSet(cards[i], cards[j], cards[k])) total++;
-  return total;
+/* --- Render one card --- */
+function renderCard(card, index) {
+  return `
+    <div class="cardItem" data-i="${index}">
+      <div class="symbols">${renderSymbols(card)}</div>
+    </div>
+  `;
 }
 
-/* ============================================================
-   GENERATE A GRID WITH EXACTLY 6 SETS
-============================================================ */
-function generateSixSetBoard() {
-  let deck = generateDeck();
-  shuffle(deck);
-
-  while (true) {
-    const board = shuffle([...deck]).slice(0, 12);
-    if (countSets(board) === 6)
-      return board;
-  }
+function renderSymbols(card) {
+  let out = "";
+  for (let i = 0; i < card.count; i++) out += renderSymbol(card);
+  return out;
 }
 
-/* ============================================================
-   RENDER
-============================================================ */
 function renderSymbol(card) {
-  const colorMap = { red:"#ff5f5f", green:"#6dff6a", blue:"#5fa8ff" };
-  const fillColor = {
-    empty: "none",
-    solid: colorMap[card.color],
-    stripe: `url(#stripe-${card.color})`
-  };
+  const color = {
+    red: "#ff5f5f",
+    green: "#6dff6a",
+    blue: "#5fa8ff"
+  }[card.color];
 
-  const shape = card.shape === "circle"
-    ? `<circle cx="25" cy="25" r="20" fill="${fillColor[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4"/>`
-    : card.shape === "square"
-      ? `<rect x="5" y="5" width="40" height="40" rx="6" fill="${fillColor[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4"/>`
-      : `<polygon points="25,5 45,45 5,45" fill="${fillColor[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4"/>`;
+  const fill = card.fill === "empty"
+    ? "none"
+    : card.fill === "solid"
+    ? color
+    : `url(#stripe-${card.color})`;
+
+  let shape;
+  if (card.shape === "circle")
+    shape = `<circle cx="25" cy="25" r="20" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
+  if (card.shape === "square")
+    shape = `<rect x="5" y="5" width="40" height="40" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
+  if (card.shape === "triangle")
+    shape = `<polygon points="25,5 45,45 5,45" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
 
   return `
-    <svg width="50" height="50" viewBox="0 0 50 50">
-      ${shape}
+    <svg class="symbol" width="50" height="50">${shape}
       <defs>
         <pattern id="stripe-${card.color}" width="6" height="6" patternUnits="userSpaceOnUse">
-          <path d="M0 0 L6 6 M-3 3 L3 9 M3 -3 L9 3"
-            stroke="${colorMap[card.color]}" stroke-width="2"/>
+          <path d="M0 0 L6 6" stroke="${color}" stroke-width="2"/>
         </pattern>
       </defs>
     </svg>
   `;
 }
 
-function renderCard(card, i) {
-  return `
-    <div class="gameCard" data-i="${i}">
-      ${Array(card.count).fill(0).map(()=>renderSymbol(card)).join("")}
-    </div>
-  `;
-}
-
-/* ============================================================
-   GAME LOGIC
-============================================================ */
-async function startDaily() {
-  selected = [];
-  mistakes = 0;
-  foundSets = 0;
-
-  mistakesEl.textContent = 0;
-  foundCountEl.textContent = 0;
-
-  deck = generateSixSetBoard();
-  grid.innerHTML = deck.map(renderCard).join("");
-
-  document.querySelectorAll(".gameCard").forEach(el => {
-    el.onclick = onCardClick;
-  });
-
-  startTimer();
-}
-
+/* --- Card selection --- */
 function onCardClick(e) {
-  const el = e.currentTarget;
-  const i = parseInt(el.dataset.i);
-
+  const i = Number(e.currentTarget.dataset.i);
   if (selected.includes(i)) return;
 
-  el.classList.add("selected");
   selected.push(i);
+  e.currentTarget.classList.add("selected");
 
-  if (selected.length === 3)
-    checkSet();
+  if (selected.length === 3) checkSet();
+}
+
+function isSet(a, b, c) {
+  return check(a.shape, b.shape, c.shape) &&
+    check(a.color, b.color, c.color) &&
+    check(a.fill, b.fill, c.fill) &&
+    check(a.count, b.count, c.count);
+}
+
+function check(a, b, c) {
+  return (a === b && b === c) || (a !== b && a !== c && b !== c);
 }
 
 function checkSet() {
-  const [i,j,k] = selected;
-  const a = deck[i], b = deck[j], c = deck[k];
+  const [i1, i2, i3] = selected;
+  const els = selected.map(i => document.querySelector(`[data-i="${i}"]`));
 
-  const els = selected.map(n => document.querySelector(`.gameCard[data-i="${n}"]`));
+  if (isSet(cards[i1], cards[i2], cards[i3])) {
+    els.forEach(e => e.classList.add("correct"));
+    setsFound++;
+    setsFoundEl.textContent = `${setsFound}/6`;
 
-  if (isSet(a,b,c)) {
-    foundSets++;
-    foundCountEl.textContent = foundSets;
+    setTimeout(() => {
+      els.forEach(e => e.classList.add("hidden"));
+    }, 300);
 
-    els.forEach(el=>el.classList.add("correct"));
-    setTimeout(()=>els.forEach(el=>el.classList.add("removed")),300);
+    if (setsFound === 6) winGame();
 
-    if (foundSets === 6)
-      winGame();
   } else {
     mistakes++;
-    mistakesEl.textContent = mistakes;
-    els.forEach(el=>el.classList.add("wrong"));
-    setTimeout(()=>els.forEach(el=>el.classList.remove("selected","wrong")),300);
+    errorsEl.textContent = mistakes;
+    els.forEach(e => e.classList.add("wrong"));
+    setTimeout(() => els.forEach(e => e.classList.remove("wrong", "selected")), 300);
   }
 
   selected = [];
@@ -236,64 +261,70 @@ function checkSet() {
 ============================================================ */
 function startTimer() {
   timer = 0;
-  timerEl.textContent = 0;
   clearInterval(timerInterval);
-
-  timerInterval = setInterval(()=>{
+  timerInterval = setInterval(() => {
     timer++;
-    timerEl.textContent = timer;
-  },1000);
+    timerEl.textContent = timer + "s";
+  }, 1000);
 }
 
-function stopTimer() { clearInterval(timerInterval); }
+function stopTimer() {
+  clearInterval(timerInterval);
+}
 
 /* ============================================================
-   END OF GAME
+   WIN GAME
 ============================================================ */
 async function winGame() {
   stopTimer();
-  btnSubmit.classList.remove("hidden");
 
-  btnSubmit.onclick = async () => {
-    await submitScore(timer, mistakes);
-  };
-}
+  if (!canWrite()) {
+    dailyStatus.textContent = "⏳ You already submitted within 1 hour.";
+    return;
+  }
 
-/* ============================================================
-   SUPABASE WRITE THROTTLE
-============================================================ */
-async function submitScore(time, mistakes) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
-  const last = localStorage.getItem("lastSubmit");
-  const now = Date.now();
-
-  if (last && now - last < 3600000)
-    return alert("You can submit only once per hour.");
-
-  localStorage.setItem("lastSubmit", now);
-
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) return;
-
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().slice(0, 10);
 
   await supabase.from("daily_scores").insert({
-    user_id: user.user.id,
+    user_id: user.id,
     date: today,
-    time,
+    time: timer,
     mistakes
   });
 
-  alert("Score submitted!");
+  recordWrite();
+
+  dailyStatus.textContent = "🎉 Score saved!";
 }
 
 /* ============================================================
    UTILS
 ============================================================ */
 function shuffle(arr) {
-  for (let i=arr.length-1; i>0; i--) {
-    const j = Math.floor(Math.random()* (i+1));
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return arr;
 }
+
+/* ============================================================
+   ADMIN
+============================================================ */
+async function loadAdminScores() {
+  const { data } = await supabase
+    .from("daily_scores")
+    .select("*")
+    .order("date", { ascending: false });
+
+  adminScores.innerHTML = data
+    .map(s => `<p>${s.date}: ${s.time}s — ${s.mistakes} mistakes</p>`)
+    .join("");
+}
+
+/* ============================================================
+   STARTUP
+============================================================ */
+loadSession();
