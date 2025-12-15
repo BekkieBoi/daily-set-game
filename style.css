@@ -1,180 +1,46 @@
-/* ---------- ROOT THEME ---------- */
-:root {
-  --bg: #0a0f1a;
-  --card: #111826;
-  --accent: #5ea0ff;
-  --accent2: #8b5eff;
-  --danger: #ff4d6d;
-  --success: #2ecc71;
-  --text: #b7c3d1;
-  --textBright: #ffffff;
-
-  --cardSize: 120px;
-  --transition: 0.18s ease;
-}
-
 body {
-  background: var(--bg);
-  color: var(--text);
-  margin: 0;
-  font-family: Inter, sans-serif;
-  display: flex;
-  justify-content: center;
-  padding: 40px 0;
-}
-
-/* ---------- CONTAINER ---------- */
-#wrapper {
-  width: 100%;
-  max-width: 900px;
+  font-family: Arial, sans-serif;
+  background: #f3f3f3;
   padding: 20px;
 }
 
-/* ---------- HEADER ---------- */
-#topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-#topbar h1 {
-  margin: 0;
-  color: white;
-  font-size: 28px;
-}
-
-#btnSignOut {
-  background: var(--danger);
-  border: none;
-  color: white;
-  padding: 10px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* ---------- AUTH CARD ---------- */
 .card {
-  background: var(--card);
-  width: 320px;
+  max-width: 430px;
   margin: auto;
+  background: white;
   padding: 20px;
-  border-radius: 14px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
 }
 
-.card h2 {
-  color: white;
-}
-
-input {
-  width: 100%;
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 8px;
-  background: #0e1624;
-  border: 1px solid #222;
-  color: white;
-}
-
-button {
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  border: none;
-  color: white;
-  transition: var(--transition);
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.blue { background: var(--accent); }
-.green { background: var(--success); }
-.gray  { background: #788ba0; }
+.hidden { display: none; }
 
 .buttonRow { display: flex; gap: 10px; margin-top: 10px; }
 
-/* ---------- GAME AREA ---------- */
-#gameWrapper {
-  display: none;
+button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #555;
+  color: white;
+  border-radius: 6px;
 }
 
-#statsRow {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  color: var(--textBright);
-  font-size: 17px;
-}
+button.green { background: #2cbf2c; }
+button.blue { background: #2c66ff; }
+button.gray { background: #777; }
 
-#grid {
+.grid {
+  margin-top: 15px;
   display: grid;
-  grid-template-columns: repeat(4, var(--cardSize));
-  gap: 14px;
-  justify-content: center;
+  grid-template-columns: repeat(4, 1fr);
+  grid-gap: 8px;
 }
 
-/* ---------- PUZZLE CARDS ---------- */
-.cardItem {
-  width: var(--cardSize);
-  height: var(--cardSize);
-  background: #162236;
-  border-radius: 10px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  border: 3px solid transparent;
-  transition: var(--transition);
-}
+.symbol { display: block; }
 
-.cardItem:hover {
-  transform: scale(1.05);
-}
+.card.selected { outline: 3px solid #2c66ff; }
+.card.correct { outline: 3px solid #2cbf2c; }
+.card.wrong { outline: 3px solid #ff4444; }
 
-.cardItem.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
-}
-
-.cardItem svg {
-  width: 80%;
-  height: 80%;
-}
-
-/* ---------- COMPLETION SCREEN ---------- */
-#completionCard {
-  display: none;
-  margin-top: 20px;
-  padding: 20px;
-  background: var(--card);
-  border-radius: 12px;
-  text-align: center;
-}
-
-#completionCard h2 {
-  color: var(--success);
-  margin-bottom: 6px;
-}
-
-#completionCard button {
-  background: var(--accent2);
-  margin-top: 12px;
-}
-
-/* ---------- CONFETTI CANVAS ---------- */
-#confettiCanvas {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-}
-
-/* ---------- HIDDEN ---------- */
-.hidden {
-  display: none !important;
-}
+.center { text-align: center; margin-top: 20px; }
