@@ -3,13 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Daily Set</title>
+  <title>Daily Set — C3</title>
   <link rel="stylesheet" href="style.css">
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="script.js"></script>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.0/dist/confetti.browser.min.js"></script>
+
+  <script defer src="script.js"></script>
 </head>
+
 <body>
 
 <!-- AUTH PANEL -->
@@ -17,10 +22,12 @@
   <h2>Daily Set</h2>
   <input id="email" type="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
+
   <div class="buttonRow">
     <button id="btnSignIn">Sign In</button>
     <button id="btnSignUp" class="green">Create Account</button>
   </div>
+
   <p id="authMsg"></p>
 </div>
 
@@ -37,15 +44,13 @@
   <div class="gameInfo">
     <p id="dailyState"></p>
     <p>Time: <span id="timer">00:00</span></p>
-    <p>Mistakes: <span id="errors">0</span></p>
+    <p>Mistakes: <span id="mistakes">0</span></p>
   </div>
 
-  <!-- CARD GRID -->
   <div id="grid" class="grid"></div>
 
   <button id="btnSubmitScore" class="blue hidden">Submit Today</button>
 
-  <!-- CONFETTI CANVAS -->
   <canvas id="confettiCanvas"></canvas>
 </div>
 
@@ -55,6 +60,5 @@
   <div id="leaderboard"></div>
 </div>
 
-<script src="script.js"></script>
 </body>
 </html>
