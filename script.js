@@ -1,220 +1,290 @@
-/* ---------- SUPABASE ---------- */
-const supabase = window.supabase.createClient(
-  "https://xmqstvgrqtllyvdehync.supabase.co",
-  "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P"
-);
+/* ============================================================
+   DAILY SET — OPTION C3
+   Full interactive puzzle engine + Supabase integration
+   ============================================================ */
+
+/* ---------- CONFIG ---------- */
+const supabaseUrl = "YOUR_URL";
+const supabaseKey = "YOUR_PUBLIC_KEY";
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 /* ---------- ELEMENTS ---------- */
-const authCard = document.getElementById("authCard");
-const gameCard = document.getElementById("gameCard");
-const grid = document.getElementById("grid");
-const btnLogin = document.getElementById("btnLogin");
-const btnSignup = document.getElementById("btnSignup");
-const btnLogout = document.getElementById("btnLogout");
-const btnSubmit = document.getElementById("btnSubmit");
-const status = document.getElementById("status");
-const authMsg = document.getElementById("authMsg");
+const gameGrid = document.getElementById("gameGrid");
+const timerEl = document.getElementById("timer");
+const mistakesEl = document.getElementById("mistakes");
+const confettiCanvas = document.getElementById("confettiCanvas");
 
-/* ---------- HELPERS ---------- */
-function msg(text) { authMsg.textContent = text; }
-
-/* Confetti (tiny lightweight version) */
-function explodeConfetti() {
-  const duration = 700;
-  const end = Date.now() + duration;
-  const colors = ["#60a5fa","#22c55e","#fbbf24"];
-
-  (function frame() {
-    confetti({
-      particleCount: 5,
-      angle: 60,
-      spread: 55,
-      colors: colors
-    });
-    if (Date.now() < end) requestAnimationFrame(frame);
-  })();
-}
-
-/* SFX */
-const ding = new Audio("https://assets.mixkit.co/active_storage/sfx/2008/2008-preview.mp3");
-
-/* ---------- CARD ATTRIBUTES ---------- */
-const COLORS = ["red","green","purple"];
-const SHAPES = ["diamond","oval","squiggle"];
-const FILLS = ["solid","striped","empty"];
-const COUNTS = [1,2,3];
-
-/* Generate 1 card */
-function makeCard() {
-  return {
-    color: COLORS[Math.floor(Math.random()*3)],
-    shape: SHAPES[Math.floor(Math.random()*3)],
-    fill: FILLS[Math.floor(Math.random()*3)],
-    count: COUNTS[Math.floor(Math.random()*3)]
-  };
-}
-
-/* Generate puzzle (12 cards) */
 let cards = [];
-function generatePuzzle() {
-  cards = Array.from({ length: 12 }, makeCard);
-}
-
-/* Render SVG shape */
-function renderShape(card) {
-  const colorMap = { red:"#ef4444", green:"#22c55e", purple:"#a855f7" };
-  const fill = card.fill === "solid"
-    ? colorMap[card.color]
-    : card.fill === "striped"
-    ? "url(#stripe)"
-    : "none";
-
-  let shapeSVG = "";
-  if (card.shape === "oval") {
-    shapeSVG = `<rect rx="20" ry="20" width="40" height="40" stroke="${colorMap[card.color]}" stroke-width="4" fill="${fill}"/>`;
-  } else if (card.shape === "diamond") {
-    shapeSVG = `<polygon points="20,0 40,20 20,40 0,20" stroke="${colorMap[card.color]}" stroke-width="4" fill="${fill}"/>`;
-  } else {
-    shapeSVG = `<path d="M5 20 Q20 -5 35 20 Q20 45 5 20" stroke="${colorMap[card.color]}" stroke-width="4" fill="${fill}"/>`;
-  }
-
-  return shapeSVG;
-}
-
-/* Render grid */
 let selected = [];
-function renderGrid() {
-  grid.innerHTML = "";
+let mistakes = 0;
+let timer = 0;
+let timerInterval = null;
 
-  cards.forEach((card, i) => {
-    const el = document.createElement("div");
-    el.className = "cardItem";
-    if (selected.includes(i)) el.classList.add("selected");
+/* ============================================================
+   CARD GENERATION
+   Each card has:
+   • shape: circle / square / triangle
+   • color: red / green / blue
+   • fill: empty / stripe / solid
+   • count: 1 / 2 / 3
+   ============================================================ */
 
-    el.innerHTML = Array(card.count).fill(null).map(() =>
-      `<svg class="shape" viewBox="0 0 40 40">${renderShape(card)}</svg>`
-    ).join("");
+const shapes = ["circle", "square", "triangle"];
+const colors = ["red", "green", "blue"];
+const fills = ["empty", "stripe", "solid"];
+const counts = [1, 2, 3];
 
-    el.onclick = () => selectCard(i);
-    grid.appendChild(el);
-  });
+function generateDeck() {
+  const deck = [];
+  for (let s of shapes) {
+    for (let c of colors) {
+      for (let f of fills) {
+        for (let n of counts) {
+          deck.push({ shape: s, color: c, fill: f, count: n });
+        }
+      }
+    }
+  }
+  return deck;
 }
 
-/* ---------- SELECT + VALIDATE ---------- */
-function allSameOrAllDiff(a,b,c) {
-  return (a===b && b===c) || (a!==b && b!==c && a!==c);
+/* ============================================================
+   SET VALIDATION
+   A valid set checks that each attribute is either:
+   • all the same, or
+   • all different
+   ============================================================ */
+
+function allSame(a, b, c) {
+  return a === b && b === c;
 }
 
-function isSet(a,b,c) {
+function allDiff(a, b, c) {
+  return a !== b && a !== c && b !== c;
+}
+
+function isSet(a, b, c) {
   return (
-    allSameOrAllDiff(a.color,b.color,c.color) &&
-    allSameOrAllDiff(a.shape,b.shape,c.shape) &&
-    allSameOrAllDiff(a.fill,b.fill,c.fill) &&
-    allSameOrAllDiff(a.count,b.count,c.count)
+    (allSame(a.shape, b.shape, c.shape) || allDiff(a.shape, b.shape, c.shape)) &&
+    (allSame(a.color, b.color, c.color) || allDiff(a.color, b.color, c.color)) &&
+    (allSame(a.fill, b.fill, c.fill) || allDiff(a.fill, b.fill, c.fill)) &&
+    (allSame(a.count, b.count, c.count) || allDiff(a.count, b.count, c.count))
   );
 }
 
-function selectCard(i) {
-  if (selected.includes(i)) {
-    selected = selected.filter(x => x !== i);
-  } else {
-    selected.push(i);
+/* ============================================================
+   RENDER CARD
+   Cards use SVG artwork
+   ============================================================ */
+
+function renderCard(card, index) {
+  return `
+    <div class="card" data-i="${index}">
+      ${renderSymbols(card)}
+    </div>
+  `;
+}
+
+function renderSymbols(card) {
+  let svg = "";
+  for (let i = 0; i < card.count; i++) {
+    svg += renderSymbol(card);
   }
+  return `<div class="symbols">${svg}</div>`;
+}
+
+function renderSymbol(card) {
+  const colorMap = {
+    red: "#ff5f5f",
+    green: "#6dff6a",
+    blue: "#5fa8ff"
+  };
+
+  const fillMap = {
+    empty: "none",
+    solid: colorMap[card.color],
+    stripe: `url(#stripe-${card.color})`
+  };
+
+  const size = 45;
+
+  let shape;
+  if (card.shape === "circle") {
+    shape = `<circle cx="25" cy="25" r="20" fill="${fillMap[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4"/>`;
+  } else if (card.shape === "square") {
+    shape = `<rect x="5" y="5" width="40" height="40" fill="${fillMap[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4" rx="6"/>`;
+  } else {
+    shape = `<polygon points="25,5 45,45 5,45" fill="${fillMap[card.fill]}" stroke="${colorMap[card.color]}" stroke-width="4"/>`;
+  }
+
+  return `
+    <svg class="symbol" width="${size}" height="${size}" viewBox="0 0 50 50">
+      ${shape}
+      <defs>
+        <pattern id="stripe-${card.color}" width="6" height="6" patternUnits="userSpaceOnUse">
+          <path d="M0 0 L6 6 M-3 3 L3 9 M3 -3 L9 3" stroke="${colorMap[card.color]}" stroke-width="2"/>
+        </pattern>
+      </defs>
+    </svg>
+  `;
+}
+
+/* ============================================================
+   GAME INITIALIZATION
+   ============================================================ */
+
+async function startGame() {
+  const deck = generateDeck();
+  shuffle(deck);
+  cards = deck.slice(0, 12);
+  gameGrid.innerHTML = cards.map(renderCard).join("");
+
+  document.querySelectorAll(".card").forEach(card =>
+    card.addEventListener("click", onCardClick)
+  );
+
+  mistakes = 0;
+  mistakesEl.textContent = "0";
+  startTimer();
+}
+
+/* ============================================================
+   CARD SELECTION LOGIC
+   ============================================================ */
+
+function onCardClick(e) {
+  const index = parseInt(e.currentTarget.dataset.i);
+  if (selected.includes(index)) return;
+
+  selected.push(index);
+  e.currentTarget.classList.add("selected");
 
   if (selected.length === 3) {
-    const [a,b,c] = selected.map(i => cards[i]);
-    if (isSet(a,b,c)) {
-      ding.play();
-      explodeConfetti();
-
-      // Replace with new cards
-      selected.sort((a,b)=>b-a).forEach(i => {
-        cards.splice(i,1,makeCard());
-      });
-
-      status.textContent = "✔ Set found!";
-    } else {
-      status.textContent = "✖ Not a set.";
-    }
-
-    selected = [];
+    checkSet();
   }
-
-  renderGrid();
 }
 
-/* ---------- DAILY SUBMISSION ---------- */
-async function checkDaily(userId) {
-  const today = new Date().toISOString().split("T")[0];
+function checkSet() {
+  const a = cards[selected[0]];
+  const b = cards[selected[1]];
+  const c = cards[selected[2]];
 
-  const { data } = await supabase
-    .from("daily_scores")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("date", today)
-    .maybeSingle();
+  const cardEls = selected.map(i =>
+    document.querySelector(`.card[data-i="${i}"]`)
+  );
 
-  if (data) {
-    status.textContent = "You already played today.";
-    btnSubmit.classList.add("hidden");
-    return false;
+  if (isSet(a, b, c)) {
+    cardEls.forEach(c => c.classList.add("correct"));
+    setTimeout(() => {
+      cardEls.forEach(c => c.classList.remove("selected", "correct"));
+      cardEls.forEach(c => c.classList.add("removed"));
+    }, 400);
+
+    playSFX("correct");
+    triggerConfetti();
+
+    // Check if puzzle finished
+    setTimeout(() => {
+      if (document.querySelectorAll(".card:not(.removed)").length === 0) {
+        winGame();
+      }
+    }, 500);
+
+  } else {
+    mistakes++;
+    mistakesEl.textContent = mistakes;
+    cardEls.forEach(c => c.classList.add("wrong"));
+    playSFX("wrong");
+
+    setTimeout(() => {
+      cardEls.forEach(c =>
+        c.classList.remove("selected", "wrong")
+      );
+    }, 300);
   }
 
-  btnSubmit.classList.remove("hidden");
-  status.textContent = "Find as many sets as you can!";
-  return true;
+  selected = [];
 }
 
-btnSubmit.onclick = async () => {
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
-  if (!user) return;
+/* ============================================================
+   TIMER
+   ============================================================ */
 
+function startTimer() {
+  timer = 0;
+  timerInterval = setInterval(() => {
+    timer++;
+    timerEl.textContent = timer + "s";
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
+
+/* ============================================================
+   FINISH GAME
+   ============================================================ */
+
+async function winGame() {
+  stopTimer();
+  playSFX("win");
+  triggerConfetti();
+
+  await submitDailyScore(timer, mistakes);
+}
+
+/* ============================================================
+   SUBMIT SCORE TO SUPABASE
+   ============================================================ */
+
+async function submitDailyScore(time, mistakes) {
   const today = new Date().toISOString().split("T")[0];
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) return;
+
   await supabase.from("daily_scores").insert({
-    user_id: user.id,
+    user_id: user.user.id,
     date: today,
-    score: 1
+    time,
+    mistakes
   });
+}
 
-  status.textContent = "Score submitted!";
-  btnSubmit.classList.add("hidden");
-};
+/* ============================================================
+   CONFETTI + SOUND
+   ============================================================ */
 
-/* ---------- AUTH ---------- */
-btnSignup.onclick = async () => {
-  const email = document.getElementById("email").value.trim();
-  const pw = document.getElementById("password").value;
-  const { error } = await supabase.auth.signUp({ email, password: pw });
-  if (error) msg(error.message);
-};
+function triggerConfetti() {
+  confetti({
+    particleCount: 70,
+    spread: 70,
+    origin: { y: 0.7 }
+  });
+}
 
-btnLogin.onclick = async () => {
-  const email = document.getElementById("email").value.trim();
-  const pw = document.getElementById("password").value;
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
-  if (error) return msg(error.message);
-  start();
-};
+function playSFX(type) {
+  const sounds = {
+    correct: new Audio("sfx/correct.wav"),
+    wrong: new Audio("sfx/wrong.wav"),
+    win: new Audio("sfx/win.wav")
+  };
+  sounds[type].play();
+}
 
-btnLogout.onclick = async () => {
-  await supabase.auth.signOut();
-  location.reload();
-};
+/* ============================================================
+   UTILS
+   ============================================================ */
 
-/* ---------- START ---------- */
-async function start() {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
-
-  authCard.classList.add("hidden");
-  gameCard.classList.remove("hidden");
-
-  const allowed = await checkDaily(data.user.id);
-  if (allowed) {
-    generatePuzzle();
-    renderGrid();
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 }
 
-start();
+/* ============================================================
+   START
+   ============================================================ */
+
+startGame();
