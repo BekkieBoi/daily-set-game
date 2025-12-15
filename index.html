@@ -3,90 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Daily Set — v2</title>
+  <title>Daily Set — Puzzle A1</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
-<!-- LOGIN CARD -->
-<div id="authCard" class="card">
-  <h2>Daily Set</h2>
-  <input id="email" type="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <div class="buttonRow">
-    <button id="btnSignIn">Sign In</button>
-    <button id="btnSignUp" class="green">Create Account</button>
-  </div>
-  <p id="authMsg"></p>
-</div>
-
-<!-- GAME CARD -->
-<div id="gameCard" class="card hidden">
-
-  <div class="topRow">
-    <h2>Today’s Puzzle</h2>
-    <button id="btnSignOut" class="gray">Sign Out</button>
+  <!-- AUTH -->
+  <div id="authCard" class="card">
+    <h2>Daily Set</h2>
+    <input id="email" type="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button id="btnLogin">Sign In</button>
+    <button id="btnSignup" class="green">Create Account</button>
+    <p id="authMsg"></p>
   </div>
 
-  <p id="gameStatus">Loading...</p>
+  <!-- GAME -->
+  <div id="gameCard" class="card hidden">
+    <div class="row">
+      <h2>Daily Puzzle</h2>
+      <button id="btnLogout" class="gray">Sign Out</button>
+    </div>
 
-  <!-- Game Grid -->
-  <div id="cardGrid" class="grid"></div>
+    <p id="status"></p>
 
-  <!-- Stats Row -->
-  <div id="statsRow">
-    <div class="stat">⏱ <span id="timer">0.0s</span></div>
-    <div class="stat">❌ <span id="mistakes">0</span></div>
+    <div id="grid" class="grid"></div>
+
+    <button id="btnSubmit" class="blue hidden">Submit Today’s Score</button>
   </div>
 
-  <button id="btnSubmitScore" class="blue hidden">Submit Score</button>
+  <!-- Confetti canvas -->
+  <canvas id="confetti"></canvas>
 
-  <!-- ACHIEVEMENT POPUP -->
-  <div id="achievementPopup" class="popup hidden"></div>
-</div>
+  <script src="script.js"></script>
 
-<!-- ADMIN DASHBOARD -->
-<div id="adminCard" class="card hidden">
-
-  <h2>Admin Dashboard</h2>
-
-  <div class="adminSection">
-    <h3>📌 Set Daily Puzzle</h3>
-    <textarea id="adminPuzzleInput" placeholder="Comma-separated card IDs"></textarea>
-    <button id="adminSetPuzzle" class="blue">Set Puzzle</button>
-  </div>
-
-  <div class="adminSection">
-    <h3>📢 Push Announcement</h3>
-    <textarea id="adminAnnouncementInput"></textarea>
-    <button id="adminPushAnnouncement" class="green">Push</button>
-  </div>
-
-  <div class="adminSection">
-    <h3>🛑 Ban User</h3>
-    <input id="adminBanUserId" placeholder="User ID">
-    <button id="adminBan" class="red">Ban</button>
-  </div>
-
-  <div class="adminSection">
-    <h3>🏆 Edit Achievements</h3>
-    <textarea id="adminAchievementInput"
-      placeholder='[{"id":"firstWin","name":"First Win","description":"Win once"}]'></textarea>
-    <button id="adminPushAchievements" class="blue">Save</button>
-  </div>
-
-  <div class="adminSection">
-    <h3>🔥 Global Reset</h3>
-    <button id="adminReset" class="red">Reset Everything</button>
-  </div>
-</div>
-
-<!-- CONFETTI + SOUND -->
-<audio id="sfxDing" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_f6c9d65c75.mp3"></audio>
-<audio id="sfxPop" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_9403e39fb1.mp3"></audio>
-
-<script src="script.js"></script>
 </body>
 </html>
