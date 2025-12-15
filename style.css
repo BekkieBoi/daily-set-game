@@ -1,46 +1,53 @@
 body {
-  font-family: Arial, sans-serif;
   background: #f3f3f3;
+  font-family: Arial, sans-serif;
   padding: 20px;
 }
 
 .card {
-  max-width: 430px;
-  margin: auto;
   background: white;
   padding: 20px;
+  margin: auto;
+  max-width: 420px;
   border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px #0002;
 }
 
 .hidden { display: none; }
 
-.buttonRow { display: flex; gap: 10px; margin-top: 10px; }
-
-button {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: #555;
-  color: white;
-  border-radius: 6px;
-}
-
-button.green { background: #2cbf2c; }
-button.blue { background: #2c66ff; }
-button.gray { background: #777; }
-
 .grid {
-  margin-top: 15px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-gap: 8px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
-.symbol { display: block; }
+.gameCard {
+  padding: 12px;
+  border: 2px solid #aaa;
+  cursor: pointer;
+  border-radius: 8px;
+}
 
-.card.selected { outline: 3px solid #2c66ff; }
-.card.correct { outline: 3px solid #2cbf2c; }
-.card.wrong { outline: 3px solid #ff4444; }
+.gameCard.selected {
+  border-color: #0099ff;
+}
 
-.center { text-align: center; margin-top: 20px; }
+.gameCard.correct { border-color: #00cc44; }
+.gameCard.wrong { border-color: #ff4444; }
+.gameCard.removed { opacity: 0.2; }
+
+.buttonRow {
+  display: flex;
+  gap: 10px;
+}
+button {
+  padding: 10px;
+  flex: 1;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.green { background: #44c767; color: white; }
+.blue { background: #3b7bff; color: white; }
+.gray { background: #aaa; color: white; }
