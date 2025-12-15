@@ -3,8 +3,8 @@
    ============================================================ */
 
 /* --------- SUPABASE ---------- */
-const supabaseUrl = "YOUR_URL";
-const supabaseKey = "YOUR_PUBLIC_KEY";
+const supabaseUrl = "https://xmqstvgrqtllyvdehync.supabase.co";
+const supabaseKey = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P";
 const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 /* ---------- DOM ELEMENTS ---------- */
