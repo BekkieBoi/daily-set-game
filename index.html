@@ -3,41 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Daily Set — Puzzle A1</title>
+  <title>Daily Set — C3</title>
   <link rel="stylesheet" href="style.css">
+
+  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-
 <body>
 
-  <!-- AUTH -->
-  <div id="authCard" class="card">
-    <h2>Daily Set</h2>
-    <input id="email" type="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button id="btnLogin">Sign In</button>
-    <button id="btnSignup" class="green">Create Account</button>
-    <p id="authMsg"></p>
+<!-- AUTH PANEL -->
+<div id="authCard" class="card">
+  <h2>Daily Set</h2>
+  <input id="email" type="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <div class="buttonRow">
+    <button id="btnSignIn">Sign In</button>
+    <button id="btnSignUp" class="green">Create Account</button>
   </div>
+  <p id="authMsg"></p>
+</div>
 
-  <!-- GAME -->
-  <div id="gameCard" class="card hidden">
-    <div class="row">
-      <h2>Daily Puzzle</h2>
-      <button id="btnLogout" class="gray">Sign Out</button>
+<!-- GAME PANEL -->
+<div id="gameCard" class="card hidden">
+  <div class="topRow">
+    <div id="profileBox">
+      <img id="avatar" class="avatar">
+      <span id="username"></span>
     </div>
-
-    <p id="status"></p>
-
-    <div id="grid" class="grid"></div>
-
-    <button id="btnSubmit" class="blue hidden">Submit Today’s Score</button>
+    <button id="btnSignOut" class="gray">Sign Out</button>
   </div>
 
-  <!-- Confetti canvas -->
-  <canvas id="confetti"></canvas>
+  <div class="gameInfo">
+    <p id="dailyState"></p>
+    <p>Time: <span id="timer">00:00</span></p>
+    <p>Mistakes: <span id="errors">0</span></p>
+  </div>
 
-  <script src="script.js"></script>
+  <!-- CARD GRID -->
+  <div id="grid" class="grid"></div>
 
+  <button id="btnSubmitScore" class="blue hidden">Submit Today</button>
+
+  <!-- CONFETTI CANVAS -->
+  <canvas id="confettiCanvas"></canvas>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="leaderboardCard" class="card hidden">
+  <h2>Leaderboard</h2>
+  <div id="leaderboard"></div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
