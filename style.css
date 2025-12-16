@@ -1,76 +1,93 @@
+/* LIGHT + DARK MODE ROOTS */
+html[data-theme="light"] {
+  --bg: #ffffff;
+  --card: #f0f0f0;
+  --text: #222;
+  --accent: #007bff;
+}
+
+html[data-theme="dark"] {
+  --bg: #121212;
+  --card: #1f1f1f;
+  --text: #e5e5e5;
+  --accent: #5fa8ff;
+}
+
+html[data-theme="auto"] {
+  color-scheme: light dark;
+}
+
+/* GLOBAL */
 body {
-  background: #f4f4f4;
-  font-family: Arial;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui;
   margin: 0;
   padding: 20px;
-  display: flex;
-  justify-content: center;
 }
 
 .card {
-  background: white;
+  background: var(--card);
   padding: 20px;
-  width: 350px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  border-radius: 14px;
+  max-width: 420px;
+  margin: auto;
+  animation: fade 0.4s ease;
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
-.row {
-  display: flex;
-  gap: 10px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-top: 15px;
-}
-
-.gameCard .infoRow {
-  display: flex;
-  justify-content: space-between;
-}
-
-.card .avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-}
-
-.card .symbol {
-  margin: 2px;
-}
-
-.card .symbols {
-  display: flex;
-  justify-content: center;
-}
-
-.card.selected {
-  outline: 3px solid #5fa8ff;
-}
-
-.card.correct {
-  background: #d7ffe0;
-}
-
-.card.wrong {
-  background: #ffd4d4;
-}
-
+/* BUTTONS */
 button {
-  padding: 10px;
+  padding: 10px 18px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  flex: 1;
+  color: white;
+  background: var(--accent);
+  font-size: 15px;
+  transition: 0.2s;
 }
 
-.green { background: #59d36c; color: white; }
-.gray  { background: #ccc; }
-.blue  { background: #4c8df5; color: white; }
+button.gray { background: #888; }
+button.green { background: #2ecc71; }
+button.blue  { background: #3498db; }
+
+button:hover { filter: brightness(1.15); }
+
+/* Floating theme button */
+.floating-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 999;
+}
+
+/* GRID */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Cards are BUTTONS now */
+.cardBtn {
+  background: var(--card);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.cardBtn.selected { transform: scale(1.1); border-color: #00ff9d; }
+.cardBtn.wrong { border-color: red; }
+.cardBtn.correct { border-color: #00ff9d; }
+
+/* Animations */
+@keyframes fade {
+  from { opacity: 0; transform: translateY(10px); }
+}
