@@ -1,4 +1,4 @@
-const supabase = supabase.createClient("YOUR_URL","YOUR_KEY");
+const supabase = supabase.createClient("https://xmqstvgrqtllyvdehync.supabase.co", "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P");
 
 const adminName = document.getElementById("adminName");
 const scoreList = document.getElementById("scoreList");
