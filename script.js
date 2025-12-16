@@ -1,330 +1,261 @@
-/* ============================================================
-   CONFIG
-============================================================ */
-const supabaseUrl = "https://xmqstvgrqtllyvdehync.supabase.co";
-const supabaseKey = "sb_publishable_3T1HdY_Di2xD4p_Vgfk4rQ_NDAhG8-P";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+/* ====== CONFIG ====== */
+const supabase = supabase.createClient("YOUR_URL", "YOUR_KEY");
 
-const AUTH_COOLDOWN_HOURS = 1;
+/* ====== ELEMENTS ====== */
+const emailEl = document.getElementById("authEmail");
+const passEl  = document.getElementById("authPassword");
+const msgEl   = document.getElementById("authMessage");
 
-/* ============================================================
-   ELEMENTS — unified IDs
-============================================================ */
-const authCard      = document.getElementById("authCard");
-const gameCard      = document.getElementById("gameCard");
-const adminCard     = document.getElementById("adminCard");
+const btnLogin = document.getElementById("btnLogin");
+const btnRegister = document.getElementById("btnRegister");
+const btnLogout = document.getElementById("btnLogout");
 
-const authEmail     = document.getElementById("authEmail");
-const authPassword  = document.getElementById("authPassword");
-const authMessage   = document.getElementById("authMessage");
+const authPanel = document.getElementById("authPanel");
+const gamePanel = document.getElementById("gamePanel");
 
-const btnSignIn     = document.getElementById("btnSignIn");
-const btnSignUp     = document.getElementById("btnSignUp");
-const btnSignOut    = document.getElementById("btnSignOut");
+const grid = document.getElementById("cardGrid");
+const timeDisplay = document.getElementById("timeDisplay");
+const errDisplay = document.getElementById("errorDisplay");
+const btnSubmit = document.getElementById("btnSubmitScore");
+const adminLink = document.getElementById("adminLink");
 
-const btnSubmitScore = document.getElementById("btnSubmitScore");
-const btnBackToGame  = document.getElementById("btnBackToGame");
+const themeToggle = document.getElementById("themeToggle");
 
-const timerEl       = document.getElementById("timer");
-const errorsEl      = document.getElementById("errors");
-const setsFoundEl   = document.getElementById("setsFound");
-const dailyStatus   = document.getElementById("dailyStatus");
+/* ====== THEME SYSTEM (Option C: Auto + Manual Override) ====== */
+let storedTheme = localStorage.getItem("theme");
 
-const gridEl        = document.getElementById("grid");
+applyTheme(storedTheme || "auto");
 
-const adminScores   = document.getElementById("adminScores");
+function applyTheme(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  localStorage.setItem("theme", t);
+}
 
-/* ============================================================
-   GAME STATE
-============================================================ */
+themeToggle.onclick = () => {
+  let t = localStorage.getItem("theme") || "auto";
+  if (t === "auto") applyTheme("light");
+  else if (t === "light") applyTheme("dark");
+  else applyTheme("auto");
+};
+
+/* ====== GAME LOGIC ====== */
 let deck = [];
-let cards = [];
 let selected = [];
-let mistakes = 0;
+let errors = 0;
+let time = 0;
+let timer = null;
 let setsFound = 0;
-
-let timer = 0;
-let timerInterval = null;
 
 const shapes = ["circle", "square", "triangle"];
 const colors = ["red", "green", "blue"];
-const fills  = ["empty", "stripe", "solid"];
+const fills  = ["solid", "stripe", "empty"];
 const counts = [1, 2, 3];
 
 function generateDeck() {
-  const d = [];
+  const out = [];
   for (let s of shapes)
     for (let c of colors)
       for (let f of fills)
         for (let n of counts)
-          d.push({ shape: s, color: c, fill: f, count: n });
-  return d;
+          out.push({shape: s, color: c, fill: f, count: n});
+  return out;
 }
 
-/* ============================================================
-   AUTH — SIGN IN / SIGN UP / SIGN OUT
-============================================================ */
-btnSignIn.onclick = async () => {
-  const { error } = await supabase.auth.signInWithPassword({
-    email: authEmail.value,
-    password: authPassword.value
-  });
-  authMessage.textContent = error ? error.message : "Logged in!";
-  if (!error) loadSession();
-};
-
-btnSignUp.onclick = async () => {
-  const { error } = await supabase.auth.signUp({
-    email: authEmail.value,
-    password: authPassword.value
-  });
-  authMessage.textContent = error ? error.message : "Account created!";
-};
-
-btnSignOut.onclick = async () => {
-  await supabase.auth.signOut();
-  showAuth();
-};
-
-/* ============================================================
-   SESSION CHECK
-============================================================ */
-async function loadSession() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return showAuth();
-
-  if (user.user_metadata?.role === "admin") showAdmin();
-  else showGame();
+function shuffle(a) {
+  for (let i = a.length-1; i > 0; i--) {
+    let j = Math.floor(Math.random()*(i+1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-function showAuth() {
-  authCard.classList.remove("hidden");
-  gameCard.classList.add("hidden");
-  adminCard.classList.add("hidden");
+/* ====== RENDER CARDS (as buttons) ====== */
+function renderCard(card, i) {
+  return `
+  <button class="cardBtn" data-i="${i}">
+    ${renderSymbols(card)}
+  </button>`;
 }
 
-function showGame() {
-  authCard.classList.add("hidden");
-  adminCard.classList.add("hidden");
-  gameCard.classList.remove("hidden");
-
-  startGame();
+function renderSymbols(card) {
+  let svg = "";
+  for (let i = 0; i < card.count; i++) {
+    svg += `
+    <svg width="35" height="35" viewBox="0 0 50 50">
+      <${shapePath(card)} stroke="${color(card)}" stroke-width="4"
+           fill="${fill(card)}" />
+    </svg>`;
+  }
+  return svg;
 }
 
-function showAdmin() {
-  authCard.classList.add("hidden");
-  gameCard.classList.add("hidden");
-  adminCard.classList.remove("hidden");
-  loadAdminScores();
+function shapePath(card) {
+  if (card.shape === "circle")
+    return `circle cx="25" cy="25" r="20"`;
+  if (card.shape === "square")
+    return `rect x="5" y="5" width="40" height="40" rx="6"`;
+  return `polygon points="25,5 45,45 5,45"`;
 }
 
-btnBackToGame.onclick = showGame;
-
-/* ============================================================
-   ONE-HOUR WRITE COOLDOWN
-============================================================ */
-function canWrite() {
-  const last = localStorage.getItem("lastWrite");
-  if (!last) return true;
-
-  const diff = (Date.now() - Number(last)) / (1000 * 60 * 60);
-  return diff >= AUTH_COOLDOWN_HOURS;
+function color(card) {
+  return card.color === "red" ? "#ff5f5f" :
+         card.color === "green" ? "#5fff77" :
+         "#5fa8ff";
 }
 
-function recordWrite() {
-  localStorage.setItem("lastWrite", Date.now());
+function fill(card) {
+  if (card.fill === "empty") return "none";
+  if (card.fill === "solid") return color(card);
+  return `url(#stripe-${card.color})`;
 }
 
-/* ============================================================
-   GAME LOGIC — OPTION E (6 SETS NEEDED)
-============================================================ */
-function startGame() {
-  mistakes = 0;
+/* ====== SET CHECK ====== */
+function allSame(a,b,c){ return a===b && b===c; }
+function allDiff(a,b,c){ return a!==b && a!==c && b!==c; }
+
+function isSet(a,b,c){
+  return (
+    (allSame(a.shape,b.shape,c.shape) || allDiff(a.shape,b.shape,c.shape)) &&
+    (allSame(a.color,b.color,c.color) || allDiff(a.color,b.color,c.color)) &&
+    (allSame(a.fill,b.fill,c.fill) || allDiff(a.fill,b.fill,c.fill)) &&
+    (allSame(a.count,b.count,c.count) || allDiff(a.count,b.count,c.count))
+  );
+}
+
+/* ====== GAME INIT ====== */
+async function loadGame() {
+  authPanel.classList.add("hidden");
+  gamePanel.classList.remove("hidden");
+
+  deck = shuffle(generateDeck()).slice(0, 12);
   setsFound = 0;
-  errorsEl.textContent = "0";
-  setsFoundEl.textContent = "0/6";
+  errors = 0;
+  errDisplay.textContent = errors;
 
-  deck = generateDeck();
-  shuffle(deck);
+  grid.innerHTML = deck.map(renderCard).join("");
 
-  cards = deck.slice(0, 12);
-
-  renderGrid();
+  document.querySelectorAll(".cardBtn").forEach(btn =>
+    btn.addEventListener("click", onCardClick)
+  );
 
   startTimer();
 }
 
-function renderGrid() {
-  gridEl.innerHTML = cards.map((c, i) => renderCard(c, i)).join("");
-
-  document.querySelectorAll(".cardItem").forEach(el =>
-    el.onclick = onCardClick
-  );
-}
-
-/* --- Render one card --- */
-function renderCard(card, index) {
-  return `
-    <div class="cardItem" data-i="${index}">
-      <div class="symbols">${renderSymbols(card)}</div>
-    </div>
-  `;
-}
-
-function renderSymbols(card) {
-  let out = "";
-  for (let i = 0; i < card.count; i++) out += renderSymbol(card);
-  return out;
-}
-
-function renderSymbol(card) {
-  const color = {
-    red: "#ff5f5f",
-    green: "#6dff6a",
-    blue: "#5fa8ff"
-  }[card.color];
-
-  const fill = card.fill === "empty"
-    ? "none"
-    : card.fill === "solid"
-    ? color
-    : `url(#stripe-${card.color})`;
-
-  let shape;
-  if (card.shape === "circle")
-    shape = `<circle cx="25" cy="25" r="20" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
-  if (card.shape === "square")
-    shape = `<rect x="5" y="5" width="40" height="40" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
-  if (card.shape === "triangle")
-    shape = `<polygon points="25,5 45,45 5,45" stroke="${color}" fill="${fill}" stroke-width="4"/>`;
-
-  return `
-    <svg class="symbol" width="50" height="50">${shape}
-      <defs>
-        <pattern id="stripe-${card.color}" width="6" height="6" patternUnits="userSpaceOnUse">
-          <path d="M0 0 L6 6" stroke="${color}" stroke-width="2"/>
-        </pattern>
-      </defs>
-    </svg>
-  `;
-}
-
-/* --- Card selection --- */
+/* ====== CLICK ====== */
 function onCardClick(e) {
-  const i = Number(e.currentTarget.dataset.i);
-  if (selected.includes(i)) return;
+  const index = +e.currentTarget.dataset.i;
+  if (selected.includes(index)) return;
 
-  selected.push(i);
+  selected.push(index);
   e.currentTarget.classList.add("selected");
 
   if (selected.length === 3) checkSet();
 }
 
-function isSet(a, b, c) {
-  return check(a.shape, b.shape, c.shape) &&
-    check(a.color, b.color, c.color) &&
-    check(a.fill, b.fill, c.fill) &&
-    check(a.count, b.count, c.count);
-}
-
-function check(a, b, c) {
-  return (a === b && b === c) || (a !== b && a !== c && b !== c);
-}
-
 function checkSet() {
-  const [i1, i2, i3] = selected;
-  const els = selected.map(i => document.querySelector(`[data-i="${i}"]`));
+  const [a,b,c] = selected.map(i => deck[i]);
+  const btns = selected.map(i => document.querySelector(`[data-i="${i}"]`));
 
-  if (isSet(cards[i1], cards[i2], cards[i3])) {
-    els.forEach(e => e.classList.add("correct"));
+  if (isSet(a,b,c)) {
+    btns.forEach(b => b.classList.add("correct"));
     setsFound++;
-    setsFoundEl.textContent = `${setsFound}/6`;
 
-    setTimeout(() => {
-      els.forEach(e => e.classList.add("hidden"));
-    }, 300);
-
-    if (setsFound === 6) winGame();
+    if (setsFound === 6) finishGame();
 
   } else {
-    mistakes++;
-    errorsEl.textContent = mistakes;
-    els.forEach(e => e.classList.add("wrong"));
-    setTimeout(() => els.forEach(e => e.classList.remove("wrong", "selected")), 300);
+    errors++;
+    errDisplay.textContent = errors;
+    btns.forEach(b => b.classList.add("wrong"));
   }
+
+  setTimeout(() => {
+    btns.forEach(b =>
+      b.classList.remove("selected","correct","wrong")
+    );
+  }, 350);
 
   selected = [];
 }
 
-/* ============================================================
-   TIMER
-============================================================ */
+/* ====== TIMER ====== */
 function startTimer() {
-  timer = 0;
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    timer++;
-    timerEl.textContent = timer + "s";
+  time = 0;
+  timer = setInterval(() => {
+    time++;
+    timeDisplay.textContent = `${time}s`;
   }, 1000);
 }
 
 function stopTimer() {
-  clearInterval(timerInterval);
+  clearInterval(timer);
 }
 
-/* ============================================================
-   WIN GAME
-============================================================ */
-async function winGame() {
+/* ====== FINISH ====== */
+async function finishGame() {
   stopTimer();
+  await submitScore();
+  btnSubmit.classList.remove("hidden");
+}
 
-  if (!canWrite()) {
-    dailyStatus.textContent = "⏳ You already submitted within 1 hour.";
-    return;
-  }
+async function submitScore() {
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) return;
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const today = new Date().toISOString().split("T")[0];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const last = localStorage.getItem("lastUpload");
+  if (last && Date.now() - +last < 3600_000) return;
+
+  localStorage.setItem("lastUpload", Date.now());
 
   await supabase.from("daily_scores").insert({
-    user_id: user.id,
+    user_id: user.user.id,
     date: today,
-    time: timer,
-    mistakes
+    time,
+    errors
   });
-
-  recordWrite();
-
-  dailyStatus.textContent = "🎉 Score saved!";
 }
 
-/* ============================================================
-   UTILS
-============================================================ */
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+/* ====== AUTH ====== */
+btnLogin.onclick = async () => {
+  let { error } = await supabase.auth.signInWithPassword({
+    email: emailEl.value,
+    password: passEl.value
+  });
+  msgEl.textContent = error ? error.message : "Logged in!";
+  if (!error) afterLogin();
+};
+
+btnRegister.onclick = async () => {
+  let { error } = await supabase.auth.signUp({
+    email: emailEl.value,
+    password: passEl.value
+  });
+  msgEl.textContent = error ? error.message : "Account created!";
+};
+
+btnLogout.onclick = async () => {
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+async function afterLogin() {
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+
+  if (!user) return;
+
+  document.getElementById("userName").textContent = user.email;
+
+  const { data: role } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id)
+    .single();
+
+  if (role && role.role === "admin") {
+    adminLink.classList.remove("hidden");
   }
+
+  loadGame();
 }
-
-/* ============================================================
-   ADMIN
-============================================================ */
-async function loadAdminScores() {
-  const { data } = await supabase
-    .from("daily_scores")
-    .select("*")
-    .order("date", { ascending: false });
-
-  adminScores.innerHTML = data
-    .map(s => `<p>${s.date}: ${s.time}s — ${s.mistakes} mistakes</p>`)
-    .join("");
-}
-
-/* ============================================================
-   STARTUP
-============================================================ */
-loadSession();
