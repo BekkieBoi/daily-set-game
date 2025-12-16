@@ -1,77 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="auto">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Daily Set — v6</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Set v7</title>
   <link rel="stylesheet" href="style.css">
-
-  <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Confetti -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
-
-  <!-- GAME SCRIPT -->
   <script defer src="script.js"></script>
 </head>
 
 <body>
+<!-- THEME TOGGLE -->
+<button id="themeToggle" class="floating-btn">🌓</button>
 
 <!-- LOGIN CARD -->
-<div id="authCard" class="card">
+<div id="authPanel" class="card">
   <h2>Daily Set</h2>
-
   <input id="authEmail" type="email" placeholder="Email">
   <input id="authPassword" type="password" placeholder="Password">
 
-  <div class="row">
-    <button id="btnSignIn">Sign In</button>
-    <button id="btnSignUp" class="green">Create Account</button>
+  <div class="buttonRow">
+    <button id="btnLogin">Log In</button>
+    <button id="btnRegister" class="green">Create Account</button>
   </div>
 
   <p id="authMessage"></p>
 </div>
 
-
-<!-- GAME CARD -->
-<div id="gameCard" class="card hidden">
-
-  <div class="topRow">
-    <div id="profileBox">
-      <img id="avatar" class="avatar">
-      <span id="username"></span>
+<!-- GAME PANEL -->
+<div id="gamePanel" class="card hidden">
+  <div class="topBar">
+    <div class="userBox">
+      <span id="userName"></span>
     </div>
-
-    <button id="btnSignOut" class="gray">Sign Out</button>
+    <button id="btnLogout" class="gray">Sign Out</button>
+    <a href="admin.html" id="adminLink" class="gray hidden">Admin</a>
   </div>
 
-  <p id="dailyStatus"></p>
-
-  <div class="infoRow">
-    <p>Time: <span id="timer">0s</span></p>
-    <p>Errors: <span id="errors">0</span></p>
-    <p>Sets Found: <span id="setsFound">0/6</span></p>
+  <div class="stats">
+    <p>Time: <span id="timeDisplay">0s</span></p>
+    <p>Errors: <span id="errorDisplay">0</span></p>
   </div>
 
-  <div id="grid" class="grid"></div>
+  <!-- CARD GRID -->
+  <div id="cardGrid" class="grid"></div>
 
-  <button id="btnSubmitScore" class="blue hidden">Submit Today</button>
+  <button id="btnSubmitScore" class="blue hidden">Submit Score</button>
 
-  <canvas id="confettiCanvas"></canvas>
-</div>
-
-
-<!-- ADMIN DASHBOARD -->
-<div id="adminCard" class="card hidden">
-  <h2>Admin Panel</h2>
-  <p>Welcome, Admin.</p>
-
-  <button id="btnBackToGame" class="gray">Back</button>
-
-  <h3>All Scores</h3>
-  <div id="adminScores"></div>
-
+  <canvas id="confetti"></canvas>
 </div>
 
 </body>
