@@ -1,56 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="auto">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Admin Dashboard</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Daily Set</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="admin.js"></script>
 </head>
 
 <body>
+
+<button id="themeToggle" class="floating-btn">🌓</button>
+
 <div id="adminPanel" class="card">
   <h2>Admin Dashboard</h2>
 
-  <p id="adminMsg"></p>
+  <p>Logged in as: <span id="adminName"></span></p>
 
-  <button id="btnShowScores" class="blue">Show Scores</button>
+  <h3>Today’s Seed</h3>
+  <div class="buttonRow">
+    <button id="btnGenerateSeed" class="green">Generate New Seed</button>
+  </div>
+
+  <p id="seedDisplay"></p>
+
+  <h3>All Scores</h3>
   <div id="scoreList"></div>
-
-  <button id="btnForceRefresh" class="green">Force Puzzle Refresh</button>
 </div>
 
-<script>
-const supabaseUrl = "YOUR_URL";
-const supabaseKey = "YOUR_PUBLIC_KEY";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
-async function verifyAdmin() {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return location.href = "index.html";
-
-  const { data } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", u.user.id)
-    .single();
-
-  if (!data || data.role !== "admin")
-    return document.body.innerHTML = "<h2>Not authorized.</h2>";
-}
-
-verifyAdmin();
-
-document.getElementById("btnShowScores").onclick = async () => {
-  const { data } = await supabase.from("daily_scores").select("*").order("time");
-  document.getElementById("scoreList").innerHTML =
-    data.map(s => `<p>${s.user_id}: ${s.time}s (${s.mistakes} mistakes)</p>`).join("");
-};
-
-document.getElementById("btnForceRefresh").onclick = async () => {
-  await supabase.from("admin_flags").update({ refresh: true }).eq("id", 1);
-  alert("Puzzle refresh flag set.");
-};
-</script>
 </body>
 </html>
